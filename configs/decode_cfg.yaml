@@ -1,0 +1,7 @@
+cls_th: 0.1
+iou_th: 0.2
+kp_th: 5000
+obj_pixel_th: 2
+wh_delta: 0.1
+alpha_ratio: 2
+draw_flag: True
