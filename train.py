@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import data
 from configs import Config, Configer
-from models import FCOSSeg, FCOSLoss
+from models import build_model, build_loss
 from utils.tranform import CommonTransforms
 from utils.logger import Logger
 from utils.meter import AverageMeter
@@ -50,6 +50,8 @@ data_cfg = cfg.data
 opt_cfg = cfg.optimizer
 decode_cfg = Config(cfg.decode_cfg_path)
 trans_cfg = Configer(configs=cfg.trans_cfg_path)
+
+decode_cfg.model_type = cfg.model_type
 
 if data_cfg.num_classes == -1:
     data_cfg.num_classes = data.get_cls_num(data_cfg.dataset)
@@ -134,7 +136,7 @@ def load_state_dict(model, optimizer, scheduler, save_dir, pretrained):
         file_list = os.listdir(save_dir)
         file_list.sort(reverse=True)
         for file in file_list:
-            if file.startswith("efficient_weights_") and file.endswith(".pth"):
+            if file.startswith(cfg.model_type+"_weights_") and file.endswith(".pth"):
                 weight_path = os.path.join(save_dir, file)
                 checkpoint = torch.load(weight_path, map_location=device_type)
                 try:
@@ -240,7 +242,7 @@ def train():
     :return:
     """
     # initialize model, optimizer, loss_fn
-    model = FCOSSeg(data_cfg.num_classes)
+    model = build_model(cfg)
 
     # initialize the dataloader by dir
     train_transforms = CommonTransforms(trans_cfg, "train")
@@ -250,7 +252,7 @@ def train():
     model = model.to(device)
     optimizer = get_optimizer(model, opt_cfg)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, verbose=True)
-    loss_fn = FCOSLoss(device)
+    loss_fn = build_loss(cfg, device)
 
     start_epoch = load_state_dict(model, optimizer, scheduler, data_cfg.save_dir, cfg.pretrained_path)
 

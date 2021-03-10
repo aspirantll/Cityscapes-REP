@@ -198,10 +198,18 @@ def decode_single(ae_mat, dets, info, decode_cfg, device):
 
 
 def covert_boxlist_to_det_boxes(boxes_list):
-    return boxes_list
+    det_boxes = []
+    for box_list in boxes_list:
+        det_boxes.append({
+            'rois': box_list.bbox.cpu().numpy(),
+            'class_ids': box_list.get_field("labels").cpu().numpy(),
+            'scores': box_list.get_field("scores").cpu().numpy(),
+            'embeddings': box_list.get_field("embeddings")
+        })
+    return det_boxes
 
 
-def decode_output(inputs, outs, infos, decode_cfg, device, eff_flag=True):
+def decode_output(inputs, outs, infos, decode_cfg, device):
     """
     decode the model output
     :param outs:
@@ -212,17 +220,19 @@ def decode_output(inputs, outs, infos, decode_cfg, device, eff_flag=True):
     :return:
     """
     # get output
-    if eff_flag:
+    if decode_cfg.model_type == "eff":
         spatial_out, box_regression, center_regression, classification, anchors = outs
         det_boxes = decode_boxes(inputs, anchors, box_regression, center_regression, classification, decode_cfg.cls_th,
                                  decode_cfg.iou_th)
-    else:
+    elif decode_cfg.model_type == "fcos":
         spatial_out, locations, box_cls, box_regression, centerness, center_embeddings = outs
         from models.fcosnet.inference import make_fcos_postprocessor
         boxes = make_fcos_postprocessor(cfg)(
             locations, box_cls, box_regression,
-            centerness, center_embeddings)
+            centerness, center_embeddings, infos[0].img_size)
         det_boxes = covert_boxlist_to_det_boxes(boxes)
+    else:
+        raise RuntimeError("no support for model type:%s"%decode_cfg.model_type)
 
     dets = parell_util.multi_apply(decode_single, spatial_out, det_boxes, infos, decode_cfg=decode_cfg, device=device)
 

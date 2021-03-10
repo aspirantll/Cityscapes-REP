@@ -116,7 +116,7 @@ def center_embedding_loss_func(center_embedding_flatten, loc_to_gt_inds_flatten,
                 center_embedding = center_embedding_flatten[loc_to_gt_inds_flatten == gt_ind, :]
                 target_embedding = center_embedding.mean(dim=0)
                 embedding_loss = embedding_loss + torch.mean(
-                    torch.pow(center_embedding - target_embedding.detach(), 2))
+                    torch.pow(center_embedding - target_embedding, 2))
                 embeddings.append(target_embedding)
             else:
                 embeddings.append(loc_to_gt_inds_flatten.new_zeros((3)))
@@ -302,7 +302,7 @@ class FCOSLossComputation(object):
             labels.append(labels_per_im)
             reg_targets.append(reg_targets_per_im)
             loc_to_gt_inds.append(locations_to_gt_inds+gt_ind)
-            gt_ind = gt_ind+gt_nums[im_i]+1
+            gt_ind = gt_ind+gt_nums[im_i]
 
         return labels, reg_targets, loc_to_gt_inds, gt_nums
 

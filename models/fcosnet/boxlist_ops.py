@@ -6,6 +6,24 @@ from torchvision.ops.boxes import batched_nms
 from .bounding_box import BoxList
 
 
+def remove_small_boxes(boxlist, min_size):
+    """
+    Only keep boxes with both sides >= min_size
+
+    Arguments:
+        boxlist (Boxlist)
+        min_size (int)
+    """
+    # TODO maybe add an API for querying the ws / hs
+    xywh_boxes = boxlist.convert("xywh").bbox
+    _, _, ws, hs = xywh_boxes.unbind(dim=1)
+    keep = (
+        (ws >= min_size) & (hs >= min_size)
+    ).nonzero().squeeze(1)
+    return boxlist[keep]
+
+
+
 def boxlist_nms(boxlist, nms_thresh, max_proposals=-1, score_field="scores"):
     """
     Performs non-maximum suppression on a boxlist, with scores specified

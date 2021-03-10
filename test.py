@@ -20,14 +20,13 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from utils.logger import Logger
-from models import EfficientSeg
+from models import build_model
 import data
 from utils import decode
 from utils.visualize import visualize_mask
 from utils import image
 from configs import Config, Configer
 from utils.tranform import CommonTransforms
-from utils import parell_util
 
 
 # global torch configs for training
@@ -52,6 +51,7 @@ data_cfg = cfg.data
 decode_cfg = Config(cfg.decode_cfg_path)
 trans_cfg = Configer(configs=cfg.trans_cfg_path)
 
+decode_cfg.model_type = cfg.model_type
 decode.base_dir = data_cfg.save_dir
 
 if data_cfg.num_classes == -1:
@@ -120,8 +120,7 @@ def test():
     :return:
     """
     # initialize model
-    model = EfficientSeg(data_cfg.num_classes, compound_coef=cfg.compound_coef,
-                         ratios=eval(cfg.anchors_ratios), scales=eval(cfg.anchors_scales))
+    model = build_model(cfg)
     load_state_dict(model)
     model = model.to(device)
 

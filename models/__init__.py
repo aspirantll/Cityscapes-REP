@@ -17,3 +17,22 @@ EFFLoss = loss.EffLoss
 FCOSLoss = loss.FCOSLoss
 
 
+def build_model(cfg):
+    if cfg.model_type == "eff":
+        model = EfficientSeg(cfg.data.num_classes, compound_coef=cfg.compound_coef,
+                     ratios=eval(cfg.anchors_ratios), scales=eval(cfg.anchors_scales))
+    elif cfg.model_type == "fcos":
+        model = FCOSSeg(cfg.data.num_classes)
+    else:
+        raise RuntimeError("no support for model type:%s"%decode_cfg.model_type)
+    return model
+
+
+def build_loss(cfg, device):
+    if cfg.model_type == "eff":
+        loss = EFFLoss(device)
+    elif cfg.model_type == "fcos":
+        loss = FCOSLoss(device)
+    else:
+        raise RuntimeError("no support for model type:%s"%decode_cfg.model_type)
+    return loss

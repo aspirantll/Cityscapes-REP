@@ -1,8 +1,6 @@
 from multiprocessing import Pool
 
-import mmcv
 import numpy as np
-from mmcv.utils import print_log
 from terminaltables import AsciiTable
 
 from .bbox_overlaps import bbox_overlaps
@@ -444,7 +442,7 @@ def print_map_summary(mean_ap,
 
     if dataset is None:
         label_names = [str(i) for i in range(num_classes)]
-    elif mmcv.is_str(dataset):
+    elif isinstance(dataset, str):
         label_names = get_classes(dataset)
     else:
         label_names = dataset
@@ -455,7 +453,7 @@ def print_map_summary(mean_ap,
     header = ['class', 'gts', 'dets', 'recall', 'ap']
     for i in range(num_scales):
         if scale_ranges is not None:
-            print_log(f'Scale range {scale_ranges[i]}', logger=logger)
+            print(f'Scale range {scale_ranges[i]}')
         table_data = [header]
         for j in range(num_classes):
             row_data = [
@@ -466,4 +464,4 @@ def print_map_summary(mean_ap,
         table_data.append(['mAP', '', '', '', f'{mean_ap[i]:.3f}'])
         table = AsciiTable(table_data)
         table.inner_footing_row_border = True
-        print_log('\n' + table.table, logger=logger)
+        print('\n' + table.table)

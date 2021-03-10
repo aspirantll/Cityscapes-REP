@@ -20,7 +20,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import data
-from models import EfficientSeg
+from models import build_model
 
 from configs import Config, Configer
 from utils.logger import Logger
@@ -40,6 +40,7 @@ device = torch.device(device_type)
 decode.device = device
 decode.draw_flag = False
 
+
 # load arguments
 print("loading the arguments...")
 parser = argparse.ArgumentParser(description="test")
@@ -52,6 +53,9 @@ cfg = Config(args.cfg_path)
 data_cfg = cfg.data
 decode_cfg = Config(cfg.decode_cfg_path)
 trans_cfg = Configer(configs=cfg.trans_cfg_path)
+
+decode_cfg.model_type = cfg.model_type
+
 
 if data_cfg.num_classes == -1:
     data_cfg.num_classes = data.get_cls_num(data_cfg.dataset)
@@ -95,8 +99,7 @@ def evaluate_model_by_weights(eval_dataloader, weights_path, logger=None):
     :return:
     """
     # initialize
-    model = EfficientSeg(data_cfg.num_classes, compound_coef=cfg.compound_coef,
-                         ratios=eval(cfg.anchors_ratios), scales=eval(cfg.anchors_scales))
+    model = build_model(cfg)
     epoch = load_state_dict(model, weights_path)
     model = model.to(device)
 

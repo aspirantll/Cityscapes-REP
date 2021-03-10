@@ -1,4 +1,3 @@
-import mmcv
 
 
 def wider_face_classes():
@@ -106,7 +105,7 @@ def get_classes(dataset):
         for alias in aliases:
             alias2name[alias] = name
 
-    if mmcv.is_str(dataset):
+    if isinstance(dataset, str):
         if dataset in alias2name:
             labels = eval(alias2name[dataset] + '_classes()')
         else:

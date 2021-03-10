@@ -247,7 +247,6 @@ class AELoss(object):
                 continue
 
             spatial_emb = torch.tanh(ae[b_i, 0:2]) + xym_s  # 2 x h x w
-            sigma = ae[b_i, 2:3]  # n_sigma x h x w
 
             instance_loss = zero_tensor(self._device)
 

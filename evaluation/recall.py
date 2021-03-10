@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 
 import numpy as np
-from mmcv.utils import print_log
 from terminaltables import AsciiTable
 
 from .bbox_overlaps import bbox_overlaps
@@ -136,7 +135,7 @@ def print_recall_summary(recalls,
         row.insert(0, num)
         table_data.append(row)
     table = AsciiTable(table_data)
-    print_log('\n' + table.table, logger=logger)
+    print('\n' + table.table)
 
 
 def plot_num_recall(recalls, proposal_nums):

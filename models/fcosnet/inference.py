@@ -1,8 +1,9 @@
 import torch
-from torchvision.ops.boxes import remove_small_boxes
 
 from models.fcosnet.bounding_box import BoxList
-from models.fcosnet.boxlist_ops import cat_boxlist, boxlist_ml_nms
+from models.fcosnet.boxlist_ops import cat_boxlist, boxlist_ml_nms, remove_small_boxes
+
+
 
 
 class FCOSPostProcessor(torch.nn.Module):
@@ -42,7 +43,7 @@ class FCOSPostProcessor(torch.nn.Module):
     def forward_for_single_feature_map(
             self, locations, box_cls,
             box_regression, centerness
-            , embedding_regression):
+            , embedding_regression, image_size):
         """
         Arguments:
             anchors: list[BoxList]
@@ -102,7 +103,7 @@ class FCOSPostProcessor(torch.nn.Module):
                 per_locations[:, 1] + per_box_regression[:, 3],
             ], dim=1)
 
-            boxlist = BoxList(detections, (int(W), int(H)), mode="xyxy")
+            boxlist = BoxList(detections, (int(image_size[1]), int(image_size[0])), mode="xyxy")
             boxlist.add_field("labels", per_class)
             boxlist.add_field("scores", torch.sqrt(per_box_cls))
             boxlist.add_field("embeddings", per_embedding_regression)
@@ -112,13 +113,13 @@ class FCOSPostProcessor(torch.nn.Module):
 
         return results
 
-    def forward(self, locations, box_cls, box_regression, centerness, center_embeddings,  image_sizes):
+    def forward(self, locations, box_cls, box_regression, centerness, center_embeddings, image_size):
         """
         Arguments:
             anchors: list[list[BoxList]]
             box_cls: list[tensor]
             box_regression: list[tensor]
-            image_sizes: list[(h, w)]
+            image_size: (h, w)
         Returns:
             boxlists (list[BoxList]): the post-processed anchors, after
                 applying box decoding and NMS
@@ -127,7 +128,7 @@ class FCOSPostProcessor(torch.nn.Module):
         for _, (l, o, b, c, e) in enumerate(zip(locations, box_cls, box_regression, centerness, center_embeddings)):
             sampled_boxes.append(
                 self.forward_for_single_feature_map(
-                    l, o, b, c, e, image_sizes
+                    l, o, b, c, e, image_size
                 )
             )
 

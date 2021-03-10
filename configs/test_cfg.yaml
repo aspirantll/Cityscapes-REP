@@ -9,8 +9,9 @@ data:
 
 seed: 1
 compound_coef: 3
+model_type: fcos
 anchors_scales: '[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)]'
 anchors_ratios: '[(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]'
-weights_path: /home/liulei/下载/efficient_weights_00000013.pth
+weights_path: /home/liulei/下载/fcos_weights_00000017.pth
 decode_cfg_path: ./configs/decode_cfg.yaml
 trans_cfg_path: ./configs/trans_cfg.json
