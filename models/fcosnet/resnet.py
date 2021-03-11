@@ -64,7 +64,7 @@ ResNet101StagesTo4 = tuple(
 # ResNet-50-FPN (including all stages)
 ResNet50FPNStagesTo5 = tuple(
     StageSpec(index=i, block_count=c, return_features=r)
-    for (i, c, r) in ((1, 3, True), (2, 4, True), (3, 6, True), (4, 3, True))
+    for (i, c, r) in ((1, 3, True), (2, 4, True), (3, 6, True))
 )
 # ResNet-101-FPN (including all stages)
 ResNet101FPNStagesTo5 = tuple(
@@ -116,7 +116,7 @@ class ResNet(nn.Module):
                 stage_spec.block_count,
                 num_groups,
                 cfg.MODEL.RESNETS.STRIDE_IN_1X1,
-                first_stride=int(stage_spec.index > 1) + 1,
+                first_stride=2,
                 dcn_config={
                     "stage_with_dcn": stage_with_dcn,
                     "with_modulated_dcn": cfg.MODEL.RESNETS.WITH_MODULATED_DCN,
@@ -143,8 +143,9 @@ class ResNet(nn.Module):
                 p.requires_grad = False
 
     def forward(self, x):
-        outputs = []
-        x = self.stem(x)
+        stem_out = self.stem(x)
+        outputs = list(stem_out)
+        x = stem_out[-1]
         for stage_name in self.stages:
             x = getattr(self, stage_name)(x)
             if self.return_features[stage_name]:
@@ -339,11 +340,11 @@ class BaseStem(nn.Module):
             nn.init.kaiming_uniform_(l.weight, a=1)
 
     def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = F.relu_(x)
-        x = F.max_pool2d(x, kernel_size=3, stride=2, padding=1)
-        return x
+        x0 = self.conv1(x)
+        x0 = self.bn1(x0)
+        x0 = F.relu_(x0)
+        x1 = F.max_pool2d(x0, kernel_size=3, stride=2, padding=1)
+        return x0, x1
 
 
 class BottleneckWithFixedBatchNorm(Bottleneck):

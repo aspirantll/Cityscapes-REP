@@ -118,18 +118,20 @@ class UpConv(nn.Module):
         )
         self.sc_gate = ChannelSpatialGate2d(out_channels)
 
-    def forward(self, x):
+    def forward(self, x, e=None):
         x = self.upsample(x)
+        if e is not None:
+            x = torch.cat([x, e], 1)
         x = self.conv1(x)
         x = self.conv2(x)
         return self.sc_gate(x)
 
 
 class SpatialHead(nn.Module):
-    def __init__(self, in_channel, out_channel):
+    def __init__(self, in_channel, channels, out_channel):
         super().__init__()
-        self.up_conv3 = UpConv(in_channel, 128, 128)
-        self.up_conv4 = UpConv(128, 64, 64)
+        self.up_conv3 = UpConv(in_channel + channels[1], 128, 128)
+        self.up_conv4 = UpConv(128 + channels[0], 64, 64)
         self.up_conv5 = UpConv(64, 32, 32)
 
         self.header = nn.Sequential(
@@ -138,9 +140,9 @@ class SpatialHead(nn.Module):
             nn.Conv2d(32, out_channel, kernel_size=1, padding=0)
         )
 
-    def forward(self, x):
-        d3 = self.up_conv3(x)
-        d2 = self.up_conv4(d3)
+    def forward(self, x, blocks):
+        d3 = self.up_conv3(x, blocks[-4])
+        d2 = self.up_conv4(d3, blocks[-5])
         d1 = self.up_conv5(d2)
 
         return self.header(d1)
@@ -158,9 +160,9 @@ class FCOSSeg(nn.Module):
             else out_channels
         self.fpn = FPN(
             in_channels_list=[
+                in_channels_stage2,
                 in_channels_stage2 * 2,
                 in_channels_stage2 * 4,
-                in_channels_stage2 * 8,
             ],
             out_channels=out_channels,
             conv_block=conv_with_kaiming_uniform(
@@ -169,8 +171,10 @@ class FCOSSeg(nn.Module):
             top_blocks=LastLevelP6P7(in_channels_p6p7, out_channels),
         )
 
+        channels = [64, 64, 256, 512, 1024]
+
         self.fcos_header = FCOSModule(cfg, out_channels)
-        self.spatial_header = SpatialHead(out_channels, out_channel=2)
+        self.spatial_header = SpatialHead(out_channels, channels, out_channel=2)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -179,10 +183,10 @@ class FCOSSeg(nn.Module):
 
     def forward(self, inputs):
         blocks = self.body(inputs)
-        features = self.fpn(blocks[1:])
+        features = self.fpn(blocks[2:])
 
         locations, box_cls, box_regression, centerness, center_embeddings = self.fcos_header(features)
-        spatial_out = self.spatial_header(features[0])
+        spatial_out = self.spatial_header(features[0], blocks)
         return spatial_out, locations, box_cls, box_regression, centerness, center_embeddings
 
     def init_weight(self):

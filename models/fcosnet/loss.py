@@ -116,7 +116,7 @@ def center_embedding_loss_func(center_embedding_flatten, loc_to_gt_inds_flatten,
                 center_embedding = center_embedding_flatten[loc_to_gt_inds_flatten == gt_ind, :]
                 target_embedding = center_embedding.mean(dim=0)
                 embedding_loss = embedding_loss + torch.mean(
-                    torch.pow(center_embedding - target_embedding, 2))
+                    torch.pow(center_embedding - target_embedding.detach(), 2))
                 embeddings.append(target_embedding)
             else:
                 embeddings.append(loc_to_gt_inds_flatten.new_zeros((3)))
