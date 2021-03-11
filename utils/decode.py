@@ -11,7 +11,6 @@ __version__ = "1.0.0"
 
 import os
 
-from models.fcosnet import cfg
 from utils.utils import BBoxTransform, ClipBoxes, generate_coordinates, generate_corner
 import cv2
 import torch
@@ -198,14 +197,14 @@ def decode_single(ae_mat, dets, info, decode_cfg, device):
 
 
 def covert_boxlist_to_det_boxes(det_results):
-    b = len(det_results)
+    b = len(det_results[0])
     det_boxes = []
     for b_i in range(b):
         det_boxes.append({
-            'rois': box_list.bbox.cpu().numpy(),
-            'class_ids': box_list.get_field("labels").cpu().numpy(),
-            'scores': box_list.get_field("scores").cpu().numpy(),
-            'embeddings': box_list.get_field("embeddings")
+            'rois': det_results[0][b_i][:, :4].cpu().numpy(),
+            'class_ids': det_results[1][b_i][:].cpu().numpy(),
+            'scores': det_results[0][b_i][:, 4].cpu().numpy(),
+            'embeddings': det_results[2][b_i]
         })
     return det_boxes
 
