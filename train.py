@@ -95,7 +95,7 @@ def save_checkpoint(model, optimizer, scheduler, epoch, save_dir):
         'scheduler': scheduler.state_dict(),
         'epoch': epoch
     }
-    weight_path = os.path.join(save_dir, "efficient_weights_{:0>8}.pth".format(epoch))
+    weight_path = os.path.join(save_dir, cfg.model_type+"_weights_{:0>8}.pth".format(epoch))
     # torch.save(best_model_wts, weight_path)
     torch.save(checkpoint, weight_path)
     logger.write("epoch {}, save the weight to {}".format(epoch, weight_path))

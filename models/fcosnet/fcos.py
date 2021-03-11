@@ -3,9 +3,6 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from .inference import make_fcos_postprocessor
-from .loss import make_fcos_loss_evaluator
-
 
 class Scale(nn.Module):
     def __init__(self, init_value=1.0):
