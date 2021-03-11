@@ -2,42 +2,49 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from models.fcosnet.fcos import FCOSModule
-from models.fcosnet.fpn import FPN, LastLevelP6P7
-from models.fcosnet.resnet import ResNet, group_norm
+from .fcosnet import fcos_head
+from mmdet.models import build_detector, build_backbone, build_neck, build_head
 from utils.utils import variance_scaling_
 import numpy as np
-from .fcosnet import cfg
 
-
-def conv_with_kaiming_uniform(use_gn=False, use_relu=False):
-    def make_conv(
-        in_channels, out_channels, kernel_size, stride=1, dilation=1
-    ):
-        conv = nn.Conv2d(
-            in_channels,
-            out_channels,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=dilation * (kernel_size - 1) // 2,
-            dilation=dilation,
-            bias=False if use_gn else True
-        )
-        # Caffe2 implementation uses XavierFill, which in fact
-        # corresponds to kaiming_uniform_ in PyTorch
-        nn.init.kaiming_uniform_(conv.weight, a=1)
-        if not use_gn:
-            nn.init.constant_(conv.bias, 0)
-        module = [conv,]
-        if use_gn:
-            module.append(group_norm(out_channels))
-        if use_relu:
-            module.append(nn.ReLU(inplace=True))
-        if len(module) > 1:
-            return nn.Sequential(*module)
-        return conv
-
-    return make_conv
+model = dict(
+    type='FCOS',
+    pretrained=None,
+    backbone=dict(
+        type='ResNet',
+        depth=50,
+        num_stages=4,
+        out_indices=(0, 1, 2, 3),
+        frozen_stages=1,
+        norm_cfg=dict(type='BN', requires_grad=False),
+        norm_eval=True,
+        style='caffe'),
+    neck=dict(
+        type='FPN',
+        in_channels=[256, 512, 1024, 2048],
+        out_channels=256,
+        start_level=1,
+        add_extra_convs=True,
+        extra_convs_on_inputs=False,  # use P5
+        num_outs=5,
+        relu_before_extra_convs=True),
+    bbox_head=dict(
+        type='FCOSModifyHead',
+        num_classes=80,
+        in_channels=256,
+        stacked_convs=4,
+        feat_channels=256,
+        strides=[8, 16, 32, 64, 128],
+        norm_cfg=None,
+        loss_cls=dict(
+            type='FocalLoss',
+            use_sigmoid=True,
+            gamma=2.0,
+            alpha=0.25,
+            loss_weight=1.0),
+        loss_bbox=dict(type='IoULoss', loss_weight=1.0),
+        loss_centerness=dict(
+            type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
 
 
 class ChannelGate2d(nn.Module):
@@ -128,21 +135,21 @@ class UpConv(nn.Module):
 
 
 class SpatialHead(nn.Module):
-    def __init__(self, in_channel, channels, out_channel):
+    def __init__(self, out_channel):
         super().__init__()
-        self.up_conv3 = UpConv(in_channel + channels[1], 128, 128)
-        self.up_conv4 = UpConv(128 + channels[0], 64, 64)
-        self.up_conv5 = UpConv(64, 32, 32)
+        self.up_conv3 = UpConv(512, 256, 256)
+        self.up_conv4 = UpConv(256, 128, 128)
+        self.up_conv5 = UpConv(128, 64, 64)
 
         self.header = nn.Sequential(
-            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
             nn.ELU(inplace=True),
-            nn.Conv2d(32, out_channel, kernel_size=1, padding=0)
+            nn.Conv2d(64, out_channel, kernel_size=1, padding=0)
         )
 
-    def forward(self, x, blocks):
-        d3 = self.up_conv3(x, blocks[-4])
-        d2 = self.up_conv4(d3, blocks[-5])
+    def forward(self, x, e):
+        d3 = self.up_conv3(x, e)
+        d2 = self.up_conv4(d3)
         d1 = self.up_conv5(d2)
 
         return self.header(d1)
@@ -151,30 +158,11 @@ class SpatialHead(nn.Module):
 class FCOSSeg(nn.Module):
     def __init__(self, num_classes):
         super(FCOSSeg, self).__init__()
-        cfg.MODEL.FCOS.NUM_CLASSES = num_classes
-        self.body = ResNet(cfg)
-
-        in_channels_stage2 = cfg.MODEL.RESNETS.RES2_OUT_CHANNELS
-        out_channels = cfg.MODEL.RESNETS.BACKBONE_OUT_CHANNELS
-        in_channels_p6p7 = in_channels_stage2 * 8 if cfg.MODEL.RETINANET.USE_C5 \
-            else out_channels
-        self.fpn = FPN(
-            in_channels_list=[
-                in_channels_stage2,
-                in_channels_stage2 * 2,
-                in_channels_stage2 * 4,
-            ],
-            out_channels=out_channels,
-            conv_block=conv_with_kaiming_uniform(
-                cfg.MODEL.FPN.USE_GN, cfg.MODEL.FPN.USE_RELU
-            ),
-            top_blocks=LastLevelP6P7(in_channels_p6p7, out_channels),
-        )
-
-        channels = [64, 64, 256, 512, 1024]
-
-        self.fcos_header = FCOSModule(cfg, out_channels)
-        self.spatial_header = SpatialHead(out_channels, channels, out_channel=2)
+        model["bbox_head"]["num_classes"] = num_classes
+        self.backbone = build_backbone(model["backbone"])
+        self.neck = build_neck(model["neck"])
+        self.bbox_head = build_head(model["bbox_head"])
+        self.spatial_header = SpatialHead(out_channel=2)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -182,12 +170,11 @@ class FCOSSeg(nn.Module):
                 m.eval()
 
     def forward(self, inputs):
-        blocks = self.body(inputs)
-        features = self.fpn(blocks[2:])
-
-        locations, box_cls, box_regression, centerness, center_embeddings = self.fcos_header(features)
-        spatial_out = self.spatial_header(features[0], blocks)
-        return spatial_out, locations, box_cls, box_regression, centerness, center_embeddings
+        blocks = self.backbone(inputs)
+        feats = self.neck(blocks)
+        cls_score, bbox_pred, centerness, center_embedding = self.bbox_head(feats)
+        spatial_out = self.spatial_header(feats[0], blocks[0])
+        return spatial_out, cls_score, bbox_pred, centerness, center_embedding
 
     def init_weight(self):
         for name, module in self.spatial_header.named_modules():
@@ -205,3 +192,6 @@ class FCOSSeg(nn.Module):
                         torch.nn.init.constant_(module.bias, bias_value)
                     else:
                         module.bias.data.zero_()
+
+        nn.init.kaiming_uniform_(self.bbox_head.conv_center_embedding.weight.data)
+        self.bbox_head.conv_center_embedding.bias.data.zero_()

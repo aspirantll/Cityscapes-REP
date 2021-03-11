@@ -15,7 +15,6 @@ import numpy as np
 import cv2
 import torch
 
-from models.fcosnet.bounding_box import BoxList
 
 
 def gaussian_radius(det_size, min_overlap=0.8):
@@ -377,11 +376,12 @@ def generate_fcos_annotations(target_size, targets, device):
         det_list.append(dets)
 
     det_annotations = np.ones((b, max_instance_num, 5), dtype=np.float32) * -1
-    box_targets = []
+    gt_boxes = []
+    gt_labels = []
     for b_i in range(b):
         dets = det_list[b_i]
         boxes = np.zeros((len(dets), 4), dtype=np.float32)
-        labels = np.zeros((len(dets)), dtype=np.float32)
+        labels = np.zeros((len(dets)), dtype=np.int64)
         for o_j, det in enumerate(dets):
             det_annotations[b_i, o_j, 0:2] = det[0]
             det_annotations[b_i, o_j, 2:4] = det[1]
@@ -391,9 +391,7 @@ def generate_fcos_annotations(target_size, targets, device):
             boxes[o_j, 2:4] = det[1]
             labels[o_j] = det[2]
 
-        box_list = BoxList(torch.tensor(boxes).to(device), (w, h), mode='xyxy')
-        box_list.add_field("labels", torch.tensor(labels).to(device))
-        box_targets.append(box_list)
+        gt_boxes.append(torch.tensor(boxes).to(device))
+        gt_labels.append(torch.tensor(labels).to(device))
 
-    return box_targets, det_annotations, instance_ids_list, instance_map_list
-
+    return gt_boxes, gt_labels, det_annotations, instance_ids_list, instance_map_list

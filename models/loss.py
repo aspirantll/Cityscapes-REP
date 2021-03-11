@@ -289,7 +289,7 @@ class EffLoss(nn.Module):
         self.det_focal_loss = DetFocalLoss()
         self.ae_loss = AELoss(device)
 
-    def forward(self, outputs, targets):
+    def forward(self, model, outputs, targets):
         # unpack the output
         spatial_out, box_regression, center_regression, classification, anchors = outputs
         det_annotations, instance_ids_list, instance_map_list = generate_all_annotations(spatial_out.shape, targets, self._device)
@@ -315,18 +315,13 @@ class FCOSLoss(nn.Module):
         super(FCOSLoss, self).__init__()
         self._device = device
         self._loss_names = ["cls_loss", "wh_loss", "center_loss", "embedding_loss", "ae_loss", "total_loss"]
-        from models.fcosnet.loss import make_fcos_loss_evaluator
-        from models.fcosnet import cfg
-        self.det_focal_loss = make_fcos_loss_evaluator(cfg)
         self.ae_loss = AELoss(device)
 
-    def forward(self, outputs, targets):
+    def forward(self, model, outputs, targets):
         # unpack the output
-        spatial_out, locations, box_cls, box_regression, centerness, center_embeddings = outputs
-        box_targets, det_annotations, instance_ids_list, instance_map_list = generate_fcos_annotations(spatial_out.shape, targets, self._device)
-        det_losses, pred_embeddings = self.det_focal_loss(
-            locations, box_cls, box_regression, centerness, center_embeddings, box_targets
-        )
+        spatial_out, cls_scores, bbox_preds, centernesses, center_embeddings = outputs
+        gt_boxes, gt_labels, det_annotations, instance_ids_list, instance_map_list = generate_fcos_annotations(spatial_out.shape, targets, self._device)
+        det_losses, pred_embeddings = model.bbox_head.loss(cls_scores, bbox_preds, centernesses, center_embeddings, gt_boxes, gt_labels, None)
 
         losses = []
         losses.extend(det_losses)

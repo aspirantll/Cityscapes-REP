@@ -46,7 +46,7 @@ def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, d
         # forward the models and loss
         with torch.no_grad():
             outputs = model(inputs)
-            dets, instance_maps, det_boxes = decode.decode_output(inputs, outputs, infos, decode_cfg, device)
+            dets, instance_maps, det_boxes = decode.decode_output(inputs, model, outputs, infos, decode_cfg, device)
         del inputs
         torch.cuda.empty_cache()
 

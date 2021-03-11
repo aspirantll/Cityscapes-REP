@@ -19,7 +19,7 @@ compound_coef: 3
 model_type: fcos
 anchors_scales: '[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)]'
 anchors_ratios: '[(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]'
-pretrained_path: /media/liulei/Data/checkpoints/fcos_mask/pre_train.pth
+pretrained_path: /media/liulei/Data/checkpoints/fcos_mask/fcos_r50_caffe_fpn_gn-head_mstrain_640-800_2x_coco-d92ceeea.pth
 decode_cfg_path: ./configs/decode_cfg.yaml
 trans_cfg_path: ./configs/trans_cfg.json
 start_eval_epoch: 1000

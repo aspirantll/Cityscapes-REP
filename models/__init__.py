@@ -24,7 +24,7 @@ def build_model(cfg):
     elif cfg.model_type == "fcos":
         model = FCOSSeg(cfg.data.num_classes)
     else:
-        raise RuntimeError("no support for model type:%s"%decode_cfg.model_type)
+        raise RuntimeError("no support for model type:%s"%cfg.model_type)
     return model
 
 
@@ -34,5 +34,5 @@ def build_loss(cfg, device):
     elif cfg.model_type == "fcos":
         loss = FCOSLoss(device)
     else:
-        raise RuntimeError("no support for model type:%s"%decode_cfg.model_type)
+        raise RuntimeError("no support for model type:%s"%cfg.model_type)
     return loss

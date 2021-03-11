@@ -197,9 +197,10 @@ def decode_single(ae_mat, dets, info, decode_cfg, device):
     return ([e for e in zip(cls_ids, confs, instance_ids)], instance_map)
 
 
-def covert_boxlist_to_det_boxes(boxes_list):
+def covert_boxlist_to_det_boxes(det_results):
+    b = len(det_results)
     det_boxes = []
-    for box_list in boxes_list:
+    for b_i in range(b):
         det_boxes.append({
             'rois': box_list.bbox.cpu().numpy(),
             'class_ids': box_list.get_field("labels").cpu().numpy(),
@@ -209,7 +210,7 @@ def covert_boxlist_to_det_boxes(boxes_list):
     return det_boxes
 
 
-def decode_output(inputs, outs, infos, decode_cfg, device):
+def decode_output(inputs, model, outs, infos, decode_cfg, device):
     """
     decode the model output
     :param outs:
@@ -225,12 +226,9 @@ def decode_output(inputs, outs, infos, decode_cfg, device):
         det_boxes = decode_boxes(inputs, anchors, box_regression, center_regression, classification, decode_cfg.cls_th,
                                  decode_cfg.iou_th)
     elif decode_cfg.model_type == "fcos":
-        spatial_out, locations, box_cls, box_regression, centerness, center_embeddings = outs
-        from models.fcosnet.inference import make_fcos_postprocessor
-        boxes = make_fcos_postprocessor(cfg)(
-            locations, box_cls, box_regression,
-            centerness, center_embeddings, infos[0].img_size)
-        det_boxes = covert_boxlist_to_det_boxes(boxes)
+        spatial_out, cls_scores, bbox_preds, centernesses, center_embedding = outs
+        det_results = model.bbox_head.get_bboxes(cls_scores, bbox_preds, centernesses, [{"img_shape": spatial_out.shape[2:], "scale_factor": 1} for i in range(spatial_out.shape[0])])
+        det_boxes = covert_boxlist_to_det_boxes(det_results)
     else:
         raise RuntimeError("no support for model type:%s"%decode_cfg.model_type)
 

@@ -124,11 +124,11 @@ def load_state_dict(model, optimizer, scheduler, save_dir, pretrained):
     :param save_dir:
     :return:
     """
-
+    model.init_weight()
     if pretrained is not None:
         state_dict = torch.load(pretrained)
         try:
-            ret = model.load_state_dict(state_dict, strict=False)
+            ret = model.load_state_dict(state_dict['state_dict'], strict=False)
             print(ret)
         except RuntimeError as e:
             print('Ignoring ' + str(e) + '"')
@@ -151,7 +151,6 @@ def load_state_dict(model, optimizer, scheduler, save_dir, pretrained):
                 model.init_weight()
                 save_checkpoint(model, optimizer, scheduler, -1, data_cfg.save_dir)
                 return start_epoch+1
-    # model.init_weight()
     save_checkpoint(model, optimizer, scheduler, -1, data_cfg.save_dir)
     return 0
 
@@ -203,7 +202,7 @@ def train_model_for_epoch(model, train_dataloader, loss_fn, optimizer, epoch):
         inputs = inputs.to(device)
         # forward the models and loss
         outputs = model(inputs)
-        loss, loss_stats = loss_fn(outputs, targets)
+        loss, loss_stats = loss_fn(model, outputs, targets)
         if loss == 0 or not torch.isfinite(loss):
             continue
 

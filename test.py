@@ -108,7 +108,7 @@ def handle_output(inputs, infos, model):
     # forward the models and loss
     with torch.no_grad():
         outputs = model(inputs)
-        dets, instance_maps, det_boxes = decode.decode_output(inputs, outputs, infos, decode_cfg, device)
+        dets, instance_maps, det_boxes = decode.decode_output(inputs, model, outputs, infos, decode_cfg, device)
         for i in range(len(dets)):
             post_handle(dets[i], instance_maps[i], infos[i])
 
