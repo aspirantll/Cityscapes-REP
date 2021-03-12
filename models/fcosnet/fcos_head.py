@@ -92,7 +92,7 @@ def center_embedding_loss_func(center_embedding_flatten, loc_to_gt_inds_flatten,
                 center_embedding = center_embedding_flatten[loc_to_gt_inds_flatten == gt_ind, :]
                 target_embedding = center_embedding.mean(dim=0)
                 embedding_loss = embedding_loss + torch.mean(
-                    torch.pow(center_embedding - target_embedding.detach(), 2))
+                    torch.abs(center_embedding - target_embedding.detach()))
                 embeddings.append(target_embedding)
             else:
                 embeddings.append(loc_to_gt_inds_flatten.new_zeros((3)))
@@ -344,7 +344,7 @@ class FCOSModifyHead(AnchorFreeHead):
             loss_centerembedding = pos_centerembedding.sum()
             center_embedding_pred = [[pos_centerembedding.new_zeros((3)) for ind in range(gt_num)] for gt_num in num_gts]
 
-        return (loss_cls, loss_bbox, loss_centerness, loss_centerembedding), center_embedding_pred
+        return (loss_cls, loss_bbox, loss_centerness, loss_centerembedding*50), center_embedding_pred
 
     @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'centernesses', 'center_embedding'))
     def get_bboxes(self,

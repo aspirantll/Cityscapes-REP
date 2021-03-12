@@ -193,5 +193,5 @@ class FCOSSeg(nn.Module):
                     else:
                         module.bias.data.zero_()
 
-        nn.init.kaiming_uniform_(self.bbox_head.conv_center_embedding.weight.data)
+        variance_scaling_(self.bbox_head.conv_center_embedding.weight.data)
         self.bbox_head.conv_center_embedding.bias.data.zero_()
