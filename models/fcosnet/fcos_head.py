@@ -344,7 +344,7 @@ class FCOSModifyHead(AnchorFreeHead):
             loss_centerembedding = pos_centerembedding.sum()
             center_embedding_pred = [[pos_centerembedding.new_zeros((3)) for ind in range(gt_num)] for gt_num in num_gts]
 
-        return (loss_cls, loss_bbox, loss_centerness, loss_centerembedding*50), center_embedding_pred
+        return (loss_cls, loss_bbox, loss_centerness, loss_centerembedding), center_embedding_pred
 
     @force_fp32(apply_to=('cls_scores', 'bbox_preds', 'centernesses', 'center_embedding'))
     def get_bboxes(self,

@@ -47,6 +47,55 @@ model = dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
 
 
+class non_bottleneck_1d(nn.Module):
+    def __init__(self, chann, dilated):
+        super().__init__()
+
+        self.conv3x1_1 = nn.Conv2d(
+            chann, chann, (3, 1), stride=1, padding=(1, 0), bias=True)
+
+        self.conv1x3_1 = nn.Conv2d(
+            chann, chann, (1, 3), stride=1, padding=(0, 1), bias=True)
+
+        self.bn1 = nn.BatchNorm2d(chann, eps=1e-03)
+
+        self.conv3x1_2 = nn.Conv2d(chann, chann, (3, 1), stride=1, padding=(
+            1*dilated, 0), bias=True, dilation=(dilated, 1))
+
+        self.conv1x3_2 = nn.Conv2d(chann, chann, (1, 3), stride=1, padding=(
+            0, 1*dilated), bias=True, dilation=(1, dilated))
+
+        self.bn2 = nn.BatchNorm2d(chann, eps=1e-03)
+
+    def forward(self, input):
+
+        output = self.conv3x1_1(input)
+        output = F.relu(output)
+        output = self.conv1x3_1(output)
+        output = self.bn1(output)
+        output = F.relu(output)
+
+        output = self.conv3x1_2(output)
+        output = F.relu(output)
+        output = self.conv1x3_2(output)
+        output = self.bn2(output)
+
+        return F.relu(output+input)  # +input = identity (residual connection)
+
+
+class UpsamplerBlock(nn.Module):
+    def __init__(self, ninput, noutput):
+        super().__init__()
+        self.conv = nn.ConvTranspose2d(
+            ninput, noutput, 3, stride=2, padding=1, output_padding=1, bias=True)
+        self.bn = nn.BatchNorm2d(noutput, eps=1e-3)
+
+    def forward(self, input):
+        output = self.conv(input)
+        output = self.bn(output)
+        return F.relu(output)
+
+
 class ChannelGate2d(nn.Module):
     """
     Channel Squeeze module
@@ -110,25 +159,15 @@ class ChannelSpatialGate2d(nn.Module):
 
 
 class UpConv(nn.Module):
-    def __init__(self, in_channels, temp_channel, out_channels):
+    def __init__(self, in_channels, out_channels):
         super(UpConv, self).__init__()
-        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channels, temp_channel, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(temp_channel),
-            nn.ReLU(inplace=True)
-        )
-        self.conv2 = nn.Sequential(
-            nn.Conv2d(temp_channel, out_channels, kernel_size=3, stride=1, padding=1),
-            nn.BatchNorm2d(out_channels),
-            nn.ReLU(inplace=True)
-        )
+        self.upsample = UpsamplerBlock(in_channels, out_channels)
+        self.conv1 = non_bottleneck_1d(out_channels, 1)
+        self.conv2 = non_bottleneck_1d(out_channels, 1)
         self.sc_gate = ChannelSpatialGate2d(out_channels)
 
     def forward(self, x, e=None):
         x = self.upsample(x)
-        if e is not None:
-            x = torch.cat([x, e], 1)
         x = self.conv1(x)
         x = self.conv2(x)
         return self.sc_gate(x)
@@ -137,18 +176,18 @@ class UpConv(nn.Module):
 class SpatialHead(nn.Module):
     def __init__(self, out_channel):
         super().__init__()
-        self.up_conv3 = UpConv(512, 256, 256)
-        self.up_conv4 = UpConv(256, 128, 128)
-        self.up_conv5 = UpConv(128, 64, 64)
+        self.up_conv3 = UpConv(256, 128)
+        self.up_conv4 = UpConv(128, 64)
+        self.up_conv5 = UpConv(64, 32)
 
         self.header = nn.Sequential(
-            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.Conv2d(32, 32, kernel_size=3, padding=1),
             nn.ELU(inplace=True),
-            nn.Conv2d(64, out_channel, kernel_size=1, padding=0)
+            nn.Conv2d(32, out_channel, kernel_size=1, padding=0)
         )
 
     def forward(self, x, e):
-        d3 = self.up_conv3(x, e)
+        d3 = self.up_conv3(x)
         d2 = self.up_conv4(d3)
         d1 = self.up_conv5(d2)
 
