@@ -141,15 +141,15 @@ def load_state_dict(model, optimizer, scheduler, save_dir, pretrained):
                 checkpoint = torch.load(weight_path, map_location=device_type)
                 try:
                     ret = model.load_state_dict(checkpoint["state_dict"], strict=False)
-                    # ret = optimizer.load_state_dict(checkpoint["optimizer"])
-                    # ret = scheduler.load_state_dict(checkpoint["scheduler"])
+                    ret = optimizer.load_state_dict(checkpoint["optimizer"])
+                    ret = scheduler.load_state_dict(checkpoint["scheduler"])
                     print(ret)
                 except RuntimeError as e:
                     print('Ignoring ' + str(e) + '"')
                 logger.write("loaded the weights:" + weight_path)
                 start_epoch = checkpoint["epoch"]
-                model.init_weight()
-                save_checkpoint(model, optimizer, scheduler, -1, data_cfg.save_dir)
+                # model.init_weight()
+                # save_checkpoint(model, optimizer, scheduler, -1, data_cfg.save_dir)
                 return start_epoch+1
     save_checkpoint(model, optimizer, scheduler, -1, data_cfg.save_dir)
     return 0

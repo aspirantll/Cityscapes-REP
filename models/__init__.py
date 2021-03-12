@@ -9,12 +9,12 @@ __copyright__ = \
 __authors__ = ""
 __version__ = "1.0.0"
 
-from . import fcos, efficient, loss
+from . import fcos, efficient
 
 EfficientSeg = efficient.EfficientSeg
 FCOSSeg = fcos.FCOSSeg
-EFFLoss = loss.EffLoss
-FCOSLoss = loss.FCOSLoss
+EFFLoss = efficient.EffLoss
+FCOSLoss = fcos.FCOSLoss
 
 
 def build_model(cfg):

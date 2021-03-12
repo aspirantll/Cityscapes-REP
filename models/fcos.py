@@ -2,10 +2,12 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .fcosnet import fcos_head
-from mmdet.models import build_detector, build_backbone, build_neck, build_head
-from utils.utils import variance_scaling_
+from utils.target_generator import generate_fcos_annotations
+from mmdet.models import build_backbone, build_neck, build_head
+from utils.utils import variance_scaling_, generate_coordinates, zero_tensor, convert_corner_to_corner
 import numpy as np
+
+from .lovasz_losses import lovasz_hinge
 
 model = dict(
     type='FCOS',
@@ -29,7 +31,7 @@ model = dict(
         num_outs=5,
         relu_before_extra_convs=True),
     bbox_head=dict(
-        type='FCOSModifyHead',
+        type='FCOSHead',
         num_classes=80,
         in_channels=256,
         stacked_convs=4,
@@ -45,6 +47,24 @@ model = dict(
         loss_bbox=dict(type='IoULoss', loss_weight=1.0),
         loss_centerness=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
+
+
+train_cfg = dict(
+    assigner=dict(
+        type='MaxIoUAssigner',
+        pos_iou_thr=0.5,
+        neg_iou_thr=0.4,
+        min_pos_iou=0,
+        ignore_iof_thr=-1),
+    allowed_border=-1,
+    pos_weight=-1,
+    debug=False)
+test_cfg = dict(
+    nms_pre=1000,
+    min_bbox_size=0,
+    score_thr=0.05,
+    nms=dict(type='nms', iou_threshold=0.5),
+    max_per_img=100)
 
 
 class non_bottleneck_1d(nn.Module):
@@ -200,8 +220,10 @@ class FCOSSeg(nn.Module):
         model["bbox_head"]["num_classes"] = num_classes
         self.backbone = build_backbone(model["backbone"])
         self.neck = build_neck(model["neck"])
+        model["bbox_head"].update(train_cfg=train_cfg)
+        model["bbox_head"].update(test_cfg=test_cfg)
         self.bbox_head = build_head(model["bbox_head"])
-        self.spatial_header = SpatialHead(out_channel=2)
+        self.spatial_header = SpatialHead(out_channel=3)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -211,9 +233,9 @@ class FCOSSeg(nn.Module):
     def forward(self, inputs):
         blocks = self.backbone(inputs)
         feats = self.neck(blocks)
-        cls_score, bbox_pred, centerness, center_embedding = self.bbox_head(feats)
+        cls_score, bbox_pred, centerness = self.bbox_head(feats)
         spatial_out = self.spatial_header(feats[0], blocks[0])
-        return spatial_out, cls_score, bbox_pred, centerness, center_embedding
+        return spatial_out, cls_score, bbox_pred, centerness
 
     def init_weight(self):
         for name, module in self.spatial_header.named_modules():
@@ -232,5 +254,101 @@ class FCOSSeg(nn.Module):
                     else:
                         module.bias.data.zero_()
 
-        variance_scaling_(self.bbox_head.conv_center_embedding.weight.data)
-        self.bbox_head.conv_center_embedding.bias.data.zero_()
+
+class AnchorFreeAELoss(object):
+    def __init__(self, device, weight=1):
+        self._device = device
+        self._weight = weight
+        self._xym = generate_coordinates().to(device)
+
+    def __call__(self, ae, targets):
+        """
+        :param ae:
+        :param targets: (instance_map_list)
+        :return:
+        """
+        # prepare step
+        det_annotations, instance_ids_list, instance_map_list = targets
+        b, c, h, w = ae.shape
+
+        xym_s = self._xym[:, 0:h, 0:w].contiguous()  # 2 x h x w
+
+        ae_loss = zero_tensor(self._device)
+        for b_i in range(b):
+            instance_ids = instance_ids_list[b_i]
+            instance_map = instance_map_list[b_i]
+
+            n = len(instance_ids)
+            if n <= 0:
+                continue
+
+            spatial_emb = torch.tanh(ae[b_i, 0:2]) + xym_s  # 2 x h x w
+            sigma = ae[b_i, 2:3]  # n_sigma x h x w
+
+            var_loss = zero_tensor(self._device)
+            instance_loss = zero_tensor(self._device)
+
+            for o_j, instance_id in enumerate(instance_ids):
+                in_mask = instance_map.eq(instance_id).view(1, h, w) # 1 x h x w
+
+                # calculate center of attraction
+                o_lt = det_annotations[b_i, o_j, 0:2][::-1].astype(np.int32)
+                o_rb = det_annotations[b_i, o_j, 2:4][::-1].astype(np.int32)
+
+                # calculate sigma
+                sigma_in = sigma[in_mask.expand_as(sigma)]
+
+                s = sigma_in.mean().view(1, 1, 1)  # n_sigma x 1 x 1
+
+                # calculate var loss before exp
+                var_loss = var_loss + \
+                           torch.mean(
+                               torch.pow(sigma_in - s.detach(), 2))
+                assert not torch.isnan(var_loss)
+
+                s = torch.exp(s)
+
+                # limit 2*box_size mask
+                lt, rb = convert_corner_to_corner(o_lt, o_rb, h, w, 1.5)
+                selected_spatial_emb = spatial_emb[:, lt[0]:rb[0], lt[1]:rb[1]]
+                label_mask = in_mask[:, lt[0]:rb[0], lt[1]:rb[1]].float()
+                center_index = ((o_lt + o_rb) / 2).astype(np.int32)
+                center = xym_s[:, center_index[0], center_index[1]].view(2, 1, 1)
+                # calculate gaussian
+                dist = torch.exp(-1 * torch.sum(
+                    torch.pow(selected_spatial_emb - center, 2) * s, 0, keepdim=True))
+
+                # apply lovasz-hinge loss
+                instance_loss = instance_loss + \
+                                lovasz_hinge(dist * 2 - 1, label_mask)
+
+            ae_loss += (var_loss + instance_loss) / max(n, 1)
+        # compute mean loss
+        return ae_loss / b
+
+
+class FCOSLoss(nn.Module):
+    def __init__(self, device):
+        super(FCOSLoss, self).__init__()
+        self._device = device
+        self._loss_names = ["cls_loss", "wh_loss", "center_loss", "ae_loss", "total_loss"]
+        self.ae_loss = AnchorFreeAELoss(device)
+
+    def forward(self, model, outputs, targets):
+        # unpack the output
+        spatial_out, cls_scores, bbox_preds, centernesses = outputs
+        gt_boxes, gt_labels, det_annotations, instance_ids_list, instance_map_list = generate_fcos_annotations(spatial_out.shape, targets, self._device)
+        det_losses = model.bbox_head.loss(cls_scores, bbox_preds, centernesses, gt_boxes, gt_labels, None)
+
+        losses = []
+        losses.extend(det_losses.values())
+        losses.append(self.ae_loss(spatial_out, (det_annotations, instance_ids_list, instance_map_list)))
+
+        # compute total loss
+        total_loss = torch.stack(losses).sum()
+        losses.append(total_loss)
+
+        return total_loss, {self._loss_names[i]: losses[i] for i in range(len(self._loss_names))}
+
+    def get_loss_states(self):
+        return self._loss_names

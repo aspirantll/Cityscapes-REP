@@ -82,10 +82,15 @@ def group_instance_map(ae_mat, boxes_cls, boxes_confs, boxes_lt, boxes_rb, cente
         if box_wh[0] < 2 or box_wh[1] < 2:
             continue
 
-        center = torch.tanh(center_embeddings[i][:2]).view(2, 1, 1)
         lt, rb = generate_corner(center_index, box_wh, h, w, 1.0)
         selected_spatial_emb = spatial_emb[:, lt[0]:rb[0], lt[1]:rb[1]]
-        s = torch.exp(center_embeddings[i][2])
+
+        if center_embeddings is not None:
+            center = torch.tanh(center_embeddings[i][:2]).view(2, 1, 1)
+            s = torch.exp(center_embeddings[i][2])
+        else:
+            center = xym_s[:, center_index[0], center_index[1]].view(2, 1, 1)
+            s = torch.exp(ae_mat[2:3, center_index[0], center_index[1]])
 
         dist = torch.exp(-1 * torch.sum(torch.pow(selected_spatial_emb -
                                                   center, 2) * s, 0, keepdim=True)).squeeze()
@@ -204,7 +209,7 @@ def covert_boxlist_to_det_boxes(det_results):
             'rois': det_results[0][b_i][:, :4].cpu().numpy(),
             'class_ids': det_results[1][b_i][:].cpu().numpy(),
             'scores': det_results[0][b_i][:, 4].cpu().numpy(),
-            'embeddings': det_results[2][b_i]
+            'embeddings': None
         })
     return det_boxes
 
@@ -225,7 +230,7 @@ def decode_output(inputs, model, outs, infos, decode_cfg, device):
         det_boxes = decode_boxes(inputs, anchors, box_regression, center_regression, classification, decode_cfg.cls_th,
                                  decode_cfg.iou_th)
     elif decode_cfg.model_type == "fcos":
-        spatial_out, cls_scores, bbox_preds, centernesses, center_embedding = outs
+        spatial_out, cls_scores, bbox_preds, centernesses = outs
         det_results = model.bbox_head.get_bboxes(cls_scores, bbox_preds, centernesses, [{"img_shape": spatial_out.shape[2:], "scale_factor": 1} for i in range(spatial_out.shape[0])])
         det_boxes = covert_boxlist_to_det_boxes(det_results)
     else:

@@ -2,7 +2,7 @@ data:
   train_dir:  /media/liulei/Data/cityscapes
   save_dir: /media/liulei/Data/checkpoints/fcos_mask
   dataset: cityscapes
-  batch_size: 2
+  batch_size: 1
   num_classes: -1
   subset: train0
 
