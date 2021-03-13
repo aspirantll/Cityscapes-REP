@@ -1,7 +1,9 @@
 import torch
+from mmcv.cnn import normal_init
 from torch import nn
 from torch.nn import functional as F
 
+from configs import Config
 from utils.target_generator import generate_fcos_annotations
 from mmdet.models import build_backbone, build_neck, build_head
 from utils.utils import variance_scaling_, generate_coordinates, zero_tensor, convert_corner_to_corner
@@ -13,23 +15,38 @@ model = dict(
     type='FCOS',
     pretrained=None,
     backbone=dict(
-        type='ResNet',
-        depth=50,
-        num_stages=4,
-        out_indices=(0, 1, 2, 3),
-        frozen_stages=1,
-        norm_cfg=dict(type='BN', requires_grad=False),
-        norm_eval=True,
-        style='caffe'),
+        type='HRNet',
+        extra=dict(
+            stage1=dict(
+                num_modules=1,
+                num_branches=1,
+                block='BOTTLENECK',
+                num_blocks=(4,),
+                num_channels=(64,)),
+            stage2=dict(
+                num_modules=1,
+                num_branches=2,
+                block='BASIC',
+                num_blocks=(4, 4),
+                num_channels=(32, 64)),
+            stage3=dict(
+                num_modules=4,
+                num_branches=3,
+                block='BASIC',
+                num_blocks=(4, 4, 4),
+                num_channels=(32, 64, 128)),
+            stage4=dict(
+                num_modules=3,
+                num_branches=4,
+                block='BASIC',
+                num_blocks=(4, 4, 4, 4),
+                num_channels=(32, 64, 128, 256)))),
     neck=dict(
-        type='FPN',
-        in_channels=[256, 512, 1024, 2048],
+        type='HRFPN',
+        in_channels=[32, 64, 128, 256],
         out_channels=256,
-        start_level=1,
-        add_extra_convs=True,
-        extra_convs_on_inputs=False,  # use P5
-        num_outs=5,
-        relu_before_extra_convs=True),
+        stride=2,
+        num_outs=5),
     bbox_head=dict(
         type='FCOSHead',
         num_classes=80,
@@ -44,12 +61,12 @@ model = dict(
             gamma=2.0,
             alpha=0.25,
             loss_weight=1.0),
-        loss_bbox=dict(type='IoULoss', loss_weight=1.0),
+        loss_bbox=dict(type='GIoULoss', loss_weight=1.0),
         loss_centerness=dict(
             type='CrossEntropyLoss', use_sigmoid=True, loss_weight=1.0)))
 
 
-train_cfg = dict(
+train_cfg = Config(cfg=dict(
     assigner=dict(
         type='MaxIoUAssigner',
         pos_iou_thr=0.5,
@@ -58,13 +75,14 @@ train_cfg = dict(
         ignore_iof_thr=-1),
     allowed_border=-1,
     pos_weight=-1,
-    debug=False)
-test_cfg = dict(
+    debug=False))
+test_cfg = Config(cfg=dict(
     nms_pre=1000,
     min_bbox_size=0,
-    score_thr=0.05,
-    nms=dict(type='nms', iou_threshold=0.5),
-    max_per_img=100)
+    score_thr=0.2,
+    nms=dict(type='nms', iou_threshold=0.2),
+    max_per_img=100))
+
 
 
 class non_bottleneck_1d(nn.Module):
@@ -238,21 +256,16 @@ class FCOSSeg(nn.Module):
         return spatial_out, cls_score, bbox_pred, centerness
 
     def init_weight(self):
+        self.neck.init_weights()
+        self.bbox_head.init_weights()
+
         for name, module in self.spatial_header.named_modules():
             is_conv_layer = isinstance(module, nn.Conv2d)
 
             if is_conv_layer:
-                if "conv_list" or "header" in name:
-                    variance_scaling_(module.weight.data)
-                else:
-                    nn.init.kaiming_uniform_(module.weight.data)
+                normal_init(module, std=0.01)
 
-                if module.bias is not None:
-                    if "classifier.header" in name:
-                        bias_value = -np.log((1 - 0.01) / 0.01)
-                        torch.nn.init.constant_(module.bias, bias_value)
-                    else:
-                        module.bias.data.zero_()
+
 
 
 class AnchorFreeAELoss(object):

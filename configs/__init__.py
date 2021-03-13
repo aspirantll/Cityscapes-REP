@@ -19,8 +19,9 @@ from utils.logger import Logger
 logger = Logger.get_logger()
 
 
-class Config(object):
+class Config(dict):
     def __init__(self, cfg_path=None, cfg=None):
+        super().__init__()
         if cfg_path is None and cfg is None:
             raise ValueError("the path or cfg must be not None.")
         if cfg is None:
@@ -37,8 +38,10 @@ class Config(object):
             if isinstance(v, dict):
                 sub_obj = Config(cfg=v)
                 self.__setattr__(k, sub_obj)
+                self.__setitem__(k, sub_obj)
             else:
                 self.__setattr__(k, v)
+                self.__setitem__(k, v)
 
     def __str__(self):
         return str(self.__dict__)

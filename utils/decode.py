@@ -202,13 +202,13 @@ def decode_single(ae_mat, dets, info, decode_cfg, device):
 
 
 def covert_boxlist_to_det_boxes(det_results):
-    b = len(det_results[0])
+    b = len(det_results)
     det_boxes = []
     for b_i in range(b):
         det_boxes.append({
-            'rois': det_results[0][b_i][:, :4].cpu().numpy(),
-            'class_ids': det_results[1][b_i][:].cpu().numpy(),
-            'scores': det_results[0][b_i][:, 4].cpu().numpy(),
+            'rois': det_results[b_i][0][:, :4].cpu().numpy(),
+            'class_ids': det_results[b_i][1][:].cpu().numpy(),
+            'scores': det_results[b_i][0][:, 4].cpu().numpy(),
             'embeddings': None
         })
     return det_boxes

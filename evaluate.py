@@ -103,7 +103,7 @@ def evaluate_model_by_weights(eval_dataloader, weights_path, logger=None):
     epoch = load_state_dict(model, weights_path)
     model = model.to(device)
 
-    eval_outputs(data_cfg, data_cfg.dataset, eval_dataloader, model, epoch, decode_cfg, device, logger, cfg.metrics)
+    return eval_outputs(data_cfg, data_cfg.dataset, eval_dataloader, model, epoch, decode_cfg, device, logger, cfg.metrics)
 
 
 def load_weight_paths(weights_dir):
@@ -112,7 +112,7 @@ def load_weight_paths(weights_dir):
     file_list = os.listdir(weights_dir)
     file_list.sort(reverse=True)
     for file in file_list:
-        if file.startswith("efficient_weights_") and file.endswith(".pth"):
+        if file.startswith(cfg.model_type+"_weights_") and file.endswith(".pth"):
             weight_path = os.path.join(weights_dir, file)
             weight_paths.append(weight_path)
     return weight_paths
@@ -122,7 +122,7 @@ def eval_weights_dir(weights_dir):
     weight_paths = load_weight_paths(weights_dir)
     logger.write("the num of weights file: {}".format(len(weight_paths)))
     for iter_id, weight_path in enumerate(weight_paths):
-        if iter_id % 2 == 0:
+        if iter_id % 1 == 0:
             evaluate_model_by_weights(eval_dataloader, weight_path, logger)
 
 

@@ -8,8 +8,11 @@ __copyright__ = \
     """
 __authors__ = ""
 __version__ = "1.0.0"
+
+import glob
 import os
 import shutil
+from collections import OrderedDict
 
 import cv2
 import torch
@@ -123,13 +126,32 @@ def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, d
         print("iou for mAP:", 0.75)
         eval_map(det_results, det_annotations, dataset=dataset, iou_thr=0.75)
     if "instance" in metrics:
-        os.environ['CITYSCAPES_DATASET'] = data_cfg.eval_dir
-        os.environ['CITYSCAPES_RESULTS'] = output_dir
+        import cityscapesscripts.evaluation.evalInstanceLevelSemanticLabeling as cityscapes_eval
 
-        # Load the Cityscapes eval script *after* setting the required env vars,
-        # since the script reads their values into global variables (at load time).
-        import cityscapesscripts.evaluation.evalInstanceLevelSemanticLabeling \
-            as cityscapes_eval
+        logger.write("Evaluating results under epoch {} ...".format(epoch))
 
-        logger.write('Evaluating...')
-        cityscapes_eval.main()
+        # set some global states in cityscapes evaluation API, before evaluating
+        cityscapes_eval.args.predictionPath = os.path.abspath(output_dir)
+        cityscapes_eval.args.predictionWalk = None
+        cityscapes_eval.args.JSONOutput = False
+        cityscapes_eval.args.colorized = False
+        cityscapes_eval.args.gtInstancesFile = os.path.join(output_dir, "gtInstances.json")
+
+        # These lines are adopted from
+        # https://github.com/mcordts/cityscapesScripts/blob/master/cityscapesscripts/evaluation/evalInstanceLevelSemanticLabeling.py # noqa
+        gt_dir = os.path.join(data_cfg.eval_dir, "gtFine",  data_cfg.subset)
+        groundTruthImgList = glob.glob(os.path.join(gt_dir, "*", "*_gtFine_instanceIds*.png"))
+        assert len(
+            groundTruthImgList
+        ), "Cannot find any ground truth images to use for evaluation. Searched for: {}".format(
+            cityscapes_eval.args.groundTruthSearch
+        )
+        predictionImgList = []
+        for gt in groundTruthImgList:
+            predictionImgList.append(cityscapes_eval.getPrediction(gt, cityscapes_eval.args))
+        results = cityscapes_eval.evaluateImgLists(
+            predictionImgList, groundTruthImgList, cityscapes_eval.args
+        )["averages"]
+
+        ret = OrderedDict()
+        ret["segm"] = {"AP": results["allAp"] * 100, "AP50": results["allAp50%"] * 100}
