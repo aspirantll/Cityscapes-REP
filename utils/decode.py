@@ -71,7 +71,7 @@ def group_instance_map(ae_mat, boxes_cls, boxes_confs, boxes_lt, boxes_rb, cente
     spatial_emb = torch.tanh(ae_mat[0:2, :, :]) + xym_s
     center_indexes = ((boxes_lt + boxes_rb) / 2).astype(np.int32)
     boxes_wh = (boxes_rb - boxes_lt).astype(np.int32)
-
+    
     n_boxes_cls, n_boxes_confs, instance_ids = [], [], []
     instance_map = torch.zeros(h, w, dtype=torch.uint8, device=device)
     conf_map = torch.zeros(h, w, dtype=torch.float32, device=device)
@@ -205,12 +205,20 @@ def covert_boxlist_to_det_boxes(det_results):
     b = len(det_results)
     det_boxes = []
     for b_i in range(b):
-        det_boxes.append({
-            'rois': det_results[b_i][0][:, :4].cpu().numpy(),
-            'class_ids': det_results[b_i][1][:].cpu().numpy(),
-            'scores': det_results[b_i][0][:, 4].cpu().numpy(),
-            'embeddings': None
-        })
+        if det_results[b_i][0].shape[0] == 0:
+            det_boxes.append({
+                'rois': np.array(()),
+                'class_ids': np.array(()),
+                'scores': np.array(()),
+                'embeddings': None
+            })
+        else:
+            det_boxes.append({
+                'rois': det_results[b_i][0][:, :4].cpu().numpy(),
+                'class_ids': det_results[b_i][1][:].cpu().numpy(),
+                'scores': det_results[b_i][0][:, 4].cpu().numpy(),
+                'embeddings': None
+            })
     return det_boxes
 
 

@@ -1,0 +1,99 @@
+[2021-03-13 21:59:43] Evaluating results under /media/liulei/Data/checkpoints/mask/eval/results_44 ...
+Creating ground truth instances from png files.
+Processing 500 images...
+Images Processed: 500 
+Matching 500 pairs of images...
+Images Processed: 500 
+##################################################
+what           :             AP         AP_50%
+##################################################
+person         :          0.304          0.591
+rider          :          0.225          0.555
+car            :          0.468          0.656
+truck          :          0.344          0.465
+bus            :          0.582          0.721
+train          :          0.236          0.469
+motorcycle     :          0.188          0.396
+bicycle        :          0.198          0.522
+--------------------------------------------------
+average        :          0.318          0.547
+[2021-03-13 22:06:26] loaded the weights:/media/liulei/Data/checkpoints/mask/weights/eff_weights_00000043.pth
+[2021-03-13 22:06:26] Evaluating results under /media/liulei/Data/checkpoints/mask/eval/results_43 ...
+Creating ground truth instances from png files.
+Processing 500 images...
+Images Processed: 500 
+Matching 500 pairs of images...
+Images Processed: 500 
+##################################################
+what           :             AP         AP_50%
+##################################################
+person         :          0.304          0.589
+rider          :          0.224          0.549
+car            :          0.468          0.654
+truck          :          0.344          0.466
+bus            :          0.575          0.713
+train          :          0.241          0.466
+motorcycle     :          0.186          0.412
+bicycle        :          0.200          0.521
+--------------------------------------------------
+average        :          0.318          0.546
+[2021-03-13 22:13:50] loaded the weights:/media/liulei/Data/checkpoints/mask/weights/eff_weights_00000042.pth
+[2021-03-13 22:13:50] Evaluating results under /media/liulei/Data/checkpoints/mask/eval/results_42 ...
+Creating ground truth instances from png files.
+Processing 500 images...
+Images Processed: 500 
+Matching 500 pairs of images...
+Images Processed: 500 
+##################################################
+what           :             AP         AP_50%
+##################################################
+person         :          0.305          0.589
+rider          :          0.223          0.546
+car            :          0.469          0.656
+truck          :          0.342          0.465
+bus            :          0.576          0.722
+train          :          0.234          0.469
+motorcycle     :          0.190          0.420
+bicycle        :          0.198          0.518
+--------------------------------------------------
+average        :          0.317          0.548
+[2021-03-13 22:20:33] loaded the weights:/media/liulei/Data/checkpoints/mask/weights/eff_weights_00000041.pth
+[2021-03-13 22:20:33] Evaluating results under /media/liulei/Data/checkpoints/mask/eval/results_41 ...
+Creating ground truth instances from png files.
+Processing 500 images...
+Images Processed: 500 
+Matching 500 pairs of images...
+Images Processed: 500 
+##################################################
+what           :             AP         AP_50%
+##################################################
+person         :          0.304          0.590
+rider          :          0.223          0.549
+car            :          0.467          0.653
+truck          :          0.346          0.465
+bus            :          0.573          0.712
+train          :          0.237          0.469
+motorcycle     :          0.188          0.413
+bicycle        :          0.197          0.519
+--------------------------------------------------
+average        :          0.317          0.546
+[2021-03-13 22:26:59] loaded the weights:/media/liulei/Data/checkpoints/mask/weights/eff_weights_00000040.pth
+[2021-03-13 22:26:59] Evaluating results under /media/liulei/Data/checkpoints/mask/eval/results_40 ...
+Creating ground truth instances from png files.
+Processing 500 images...
+Images Processed: 500 
+Matching 500 pairs of images...
+Images Processed: 500 
+##################################################
+what           :             AP         AP_50%
+##################################################
+person         :          0.305          0.591
+rider          :          0.222          0.546
+car            :          0.468          0.656
+truck          :          0.340          0.462
+bus            :          0.575          0.712
+train          :          0.241          0.466
+motorcycle     :          0.185          0.398
+bicycle        :          0.197          0.519
+--------------------------------------------------
+average        :          0.317          0.544

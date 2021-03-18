@@ -143,8 +143,7 @@ class CityscapesDataset(Dataset):
                             fn if is_label(f)]
         self.filenamesGt.sort()
 
-        if transforms is not None:
-            self._transforms = transforms  # ADDED THIS
+        self._transforms = transforms  # ADDED THIS
 
         print("dataset size: {}".format(len(self.filenames)))
 
@@ -157,9 +156,10 @@ class CityscapesDataset(Dataset):
         filenameGt = self.filenamesGt[index]
         instance_img = load_instance_image(filenameGt)
         label = decode_instance(instance_img)
-
-        input_img, label, trans_info = self._transforms(input_img, label, img_path)
-        return input_img, label, trans_info
+        if self._transforms is not None:
+            return self._transforms(input_img, label, img_path)
+        else:
+            return input_img, label, None
 
     def __len__(self):
         return len(self.filenames)

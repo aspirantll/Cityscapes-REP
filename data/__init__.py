@@ -56,6 +56,14 @@ def collate_fn_without_label(batch):
     return input_tensors, trans_infos
 
 
+def get_dataset(dataset_type, data_dir, phase, transforms=None):
+    # determine the class of DatasetBuilder by dataset type
+    dataset_builder_class = datasetBuildersMap[dataset_type]
+    # initialize dataset
+    dataset_builder = dataset_builder_class(data_dir, phase)
+    return dataset_builder.get_dataset(transforms=transforms)
+
+
 def get_dataloader(batch_size, dataset_type, data_dir, phase, transforms=None, num_workers=0, random=True, with_label=True):
     """
     initialize the data loader, and then return a data loader

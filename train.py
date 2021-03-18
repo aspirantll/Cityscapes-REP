@@ -15,7 +15,6 @@ import argparse
 import torch
 import os
 import time
-import numpy as np
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -124,11 +123,10 @@ def load_state_dict(model, optimizer, scheduler, save_dir, pretrained):
     :param save_dir:
     :return:
     """
-    model.init_weight()
     if pretrained is not None:
         state_dict = torch.load(pretrained)
         try:
-            ret = model.load_state_dict(state_dict['state_dict'], strict=False)
+            ret = model.load_state_dict(state_dict, strict=False)
             print(ret)
         except RuntimeError as e:
             print('Ignoring ' + str(e) + '"')
@@ -151,6 +149,7 @@ def load_state_dict(model, optimizer, scheduler, save_dir, pretrained):
                 # model.init_weight()
                 # save_checkpoint(model, optimizer, scheduler, -1, data_cfg.save_dir)
                 return start_epoch+1
+    model.init_weight()
     save_checkpoint(model, optimizer, scheduler, -1, data_cfg.save_dir)
     return 0
 

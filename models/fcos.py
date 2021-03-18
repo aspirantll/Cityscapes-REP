@@ -79,10 +79,9 @@ train_cfg = Config(cfg=dict(
 test_cfg = Config(cfg=dict(
     nms_pre=1000,
     min_bbox_size=0,
-    score_thr=0.2,
+    score_thr=0.15,
     nms=dict(type='nms', iou_threshold=0.2),
     max_per_img=100))
-
 
 
 class non_bottleneck_1d(nn.Module):
@@ -256,8 +255,8 @@ class FCOSSeg(nn.Module):
         return spatial_out, cls_score, bbox_pred, centerness
 
     def init_weight(self):
-        self.neck.init_weights()
-        self.bbox_head.init_weights()
+        # self.neck.init_weights()
+        # self.bbox_head.init_weights()
 
         for name, module in self.spatial_header.named_modules():
             is_conv_layer = isinstance(module, nn.Conv2d)

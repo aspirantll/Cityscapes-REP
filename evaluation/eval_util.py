@@ -43,6 +43,8 @@ def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, d
     det_annotations = []
     for iter_id, eval_data in tqdm(enumerate(eval_dataloader), total=num_iter,
                                    desc="eval for epoch {}".format(epoch)):
+        if iter_id>3000:
+            break
         # to device
         inputs, targets, infos = eval_data
         inputs = inputs.to(device)
