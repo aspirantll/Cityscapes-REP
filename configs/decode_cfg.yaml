@@ -4,4 +4,4 @@ kp_th: 5000
 obj_pixel_th: 2
 wh_delta: 0.1
 alpha_ratio: 2
-draw_flag: True
+draw_flag: False

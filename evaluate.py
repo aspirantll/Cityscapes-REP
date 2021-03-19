@@ -127,7 +127,7 @@ def eval_weights_dir(weights_dir):
 
 
 if __name__ == "__main__":
-    transforms = CommonTransforms(trans_cfg, "val")
+    transforms = CommonTransforms(trans_cfg, "val", device)
     eval_dataloader = data.get_dataloader(data_cfg.batch_size, data_cfg.dataset, data_cfg.eval_dir,
                                           phase=data_cfg.subset, transforms=transforms)
     # eval

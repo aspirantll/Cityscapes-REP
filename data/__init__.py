@@ -52,7 +52,7 @@ def collate_fn_without_label(batch):
     """
     batch_inputs = [e for e in zip(*batch)]
     input_tensors = torch.stack(batch_inputs[0])
-    trans_infos = batch_inputs[1]
+    trans_infos = batch_inputs[2]
     return input_tensors, trans_infos
 
 

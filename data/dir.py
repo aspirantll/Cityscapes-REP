@@ -13,6 +13,7 @@ import os
 from torch.utils import data
 from data.dataset import DatasetBuilder
 from utils.image import load_rgb_image
+from utils.tranform import TransInfo
 
 
 class DirDataset(data.Dataset):
@@ -32,9 +33,10 @@ class DirDataset(data.Dataset):
         # locating index
         path = self.imgs[index]
         input_img = load_rgb_image(path)
+        img_size = input_img.shape[:2]
         if self._transforms is not None:
-            input_img, _, trans_info = self._transforms(input_img, img_path=path)
-        return input_img, trans_info
+            input_img, _ = self._transforms(input_img)
+        return input_img, None, TransInfo(path, img_size)
 
     def __len__(self):
         return len(self.imgs)

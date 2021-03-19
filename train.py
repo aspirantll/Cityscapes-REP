@@ -197,8 +197,6 @@ def train_model_for_epoch(model, train_dataloader, loss_fn, optimizer, epoch):
         # load data time
         data_time.update(time.time() - last)
         inputs, targets, infos = train_data
-        # to device
-        inputs = inputs.to(device)
         # forward the models and loss
         outputs = model(inputs)
         loss, loss_stats = loss_fn(model, outputs, targets)
@@ -243,7 +241,7 @@ def train():
     model = build_model(cfg)
 
     # initialize the dataloader by dir
-    train_transforms = CommonTransforms(trans_cfg, "train")
+    train_transforms = CommonTransforms(trans_cfg, "train", device)
     train_dataloader = data.get_dataloader(data_cfg.batch_size, data_cfg.dataset, data_cfg.train_dir,
                                            phase=data_cfg.subset, transforms=train_transforms)
 

@@ -98,16 +98,15 @@ def post_handle(det, instance_map, info):
     logger.write("in {} detected {} objs".format(name, len(det)))
 
     img = cv2.imread(img_path)
-    for j in tqdm(enumerate(range(len(det))), total=len(det)):
+    for j in range(len(det)):
         cls_id, conf, instance_id = det[j]
         img = visualize_mask(img, instance_map==instance_id)
-    # save_path = os.path.join(data_cfg.save_dir, name)
-    # cv2.imwrite(save_path, img)
-    # logger.write("detected result saved in {}".format(save_path))
+    save_path = os.path.join(data_cfg.save_dir, name)
+    cv2.imwrite(save_path, img)
+    logger.write("detected result saved in {}".format(save_path))
 
 
 def handle_output(inputs, infos, model):
-    inputs = inputs.to(device)
     # forward the models and loss
     with torch.no_grad():
         outputs = model(inputs)
@@ -129,7 +128,7 @@ def test():
 
     # test model
     model.eval()
-    transforms = CommonTransforms(trans_cfg, "val")
+    transforms = CommonTransforms(trans_cfg, "val", device)
 
     decode.device = device
     if data_cfg.test_dir is not None:
@@ -138,10 +137,9 @@ def test():
                                               with_label=False, phase="test", transforms=transforms)
         # foreach the images
         for iter_id, test_data in enumerate(test_dataloader):
-            if iter_id >= 288:
-                # to device
-                inputs, infos = test_data
-                handle_output(inputs, infos, model)
+            # to device
+            inputs, infos = test_data
+            handle_output(inputs, infos, model)
     else:
         img_path = data_cfg.test_image
         input_img = image.load_rgb_image(img_path)

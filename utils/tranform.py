@@ -16,6 +16,7 @@ from PIL import Image
 
 TransInfo = namedtuple('TransInfo', ['img_path', 'img_size'])
 
+
 class Normalize(object):
     """Normalize a ``torch.tensor``
 
@@ -162,29 +163,18 @@ class Augmenter(object):
         return image, label
 
 
-class Normalizer(object):
-
-    def __init__(self, div_value, mean, std):
-        self.div_value = div_value
-        self.mean = mean
-        self.std = std
-
-    def __call__(self, image):
-        return ((image.astype(np.float32)/self.div_value - self.mean) / self.std).astype(np.float32)
-
-
 class CommonTransforms(object):
-    def __init__(self, trans_cfg, phase="train"):
+    def __init__(self, trans_cfg, phase="train", device=None):
         self.configer = trans_cfg
-        self.normalizer = Normalizer(div_value=self.configer.get('normalize', 'div_value'),
+        self.normalizer = Normalize(div_value=self.configer.get('normalize', 'div_value'),
                             mean=self.configer.get('normalize', 'mean'),
                             std=self.configer.get('normalize', 'std'))
         self.aug = Augmenter()
-        # self.resizer = Resizer(input_size)
         self.to_tensor = ToTensor()
         self.phase = phase
+        self.device = device
 
-    def __call__(self, img, label=None, img_path=None):
+    def __call__(self, img, label=None):
         """
         compose transform the all the transform
         :param img:  rgb and the shape is h*w*c
@@ -192,9 +182,10 @@ class CommonTransforms(object):
         :param img_path: as the key
         :return:
         """
-        img_size = img.shape[:2]
-        img = self.normalizer(img)
         if self.phase == "train":
             img, label = self.aug(img, label)
         input_tensor = self.to_tensor(img)
-        return input_tensor, label, TransInfo(img_path, img_size)
+        if self.device is not None:
+            input_tensor = input_tensor.to(self.device)
+        input_tensor = self.normalizer(input_tensor)
+        return input_tensor, label

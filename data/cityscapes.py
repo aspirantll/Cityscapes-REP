@@ -2,6 +2,7 @@ import os
 import numpy as np
 from torch.utils.data import Dataset
 
+from utils.tranform import TransInfo
 from .dataset import DatasetBuilder
 from utils.image import load_rgb_image, load_instance_image
 
@@ -156,10 +157,11 @@ class CityscapesDataset(Dataset):
         filenameGt = self.filenamesGt[index]
         instance_img = load_instance_image(filenameGt)
         label = decode_instance(instance_img)
+        img_size = input_img.shape[:2]
+
         if self._transforms is not None:
-            return self._transforms(input_img, label, img_path)
-        else:
-            return input_img, label, None
+            input_img, label = self._transforms(input_img, label)
+        return input_img, label, TransInfo(img_path, img_size)
 
     def __len__(self):
         return len(self.filenames)

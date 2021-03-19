@@ -102,7 +102,7 @@ def evaluate_fps(test_dataloader, weights_path):
     :param eval_dataloader:
     :return:
     """
-    inputs_list = [eval_data[0] for eval_data in test_dataloader]
+    data_list = [eval_data for eval_data in test_dataloader]
     if cfg.model_type != 'maskRCNN':
         # initialize
         model = build_model(cfg)
@@ -110,14 +110,15 @@ def evaluate_fps(test_dataloader, weights_path):
         model = model.to(device)
 
         model.eval()
-        num_iter = len(inputs_list)
+        num_iter = len(data_list)
 
         start_time = time()
         # foreach the images
-        for iter_id, inputs in tqdm(enumerate(inputs_list), total=num_iter,
+        for iter_id, eval_data in tqdm(enumerate(data_list), total=num_iter,
                                        desc="eval fps for epoch {}".format(epoch)):
-            # to device
-            inputs = inputs.to(device)
+            if iter_id > 10:
+                break
+            inputs, infos = eval_data
             # forward the models and loss
             with torch.no_grad():
                 outputs = model(inputs)
@@ -129,11 +130,11 @@ def evaluate_fps(test_dataloader, weights_path):
         config_file = 'configs/mask_rcnn_r50_fpn_1x_cityscapes.py'
         # init a detector
         model = init_detector(config_file, weights_path, device=device)
-        num_iter = len(inputs_list)
+        num_iter = len(data_list)
 
         start_time = time()
         # foreach the images
-        for iter_id, img in tqdm(enumerate(inputs_list), total=num_iter,
+        for iter_id, img in tqdm(enumerate(data_list), total=num_iter,
                                        desc="eval fps"):
             # to device
             inference_detector(model, img)
@@ -149,9 +150,9 @@ if __name__ == "__main__":
         test_dataloader = data.get_dataset(data_cfg.dataset, data_cfg.eval_dir,
                                               phase=data_cfg.subset)
     else:
-        transforms = CommonTransforms(trans_cfg, "val")
+        transforms = CommonTransforms(trans_cfg, "val", device)
         test_dataloader = data.get_dataloader(data_cfg.batch_size, data_cfg.dataset, data_cfg.eval_dir,
-                                              with_label=False, phase="test", transforms=transforms)
+                                              with_label=False, phase=data_cfg.subset, transforms=transforms)
     # eval
     print("start to evaluate fps...")
 
