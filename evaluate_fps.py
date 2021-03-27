@@ -29,7 +29,7 @@ from models import build_model
 
 from configs import Config, Configer
 from utils.logger import Logger
-from utils import decode
+from utils import post_processor
 from utils.tranform import CommonTransforms
 
 # global torch configs for training
@@ -41,8 +41,8 @@ use_cuda = torch.cuda.is_available()
 device_type ='cuda' if use_cuda else 'cpu'
 device = torch.device(device_type)
 
-decode.device = device
-decode.draw_flag = False
+post_processor.device = device
+post_processor.draw_flag = False
 
 
 # load arguments
@@ -102,7 +102,7 @@ def evaluate_fps(test_dataloader, weights_path):
     :param eval_dataloader:
     :return:
     """
-    data_list = [eval_data for eval_data in test_dataloader]
+    # data_list = [eval_data for eval_data in test_dataloader]
     if cfg.model_type != 'maskRCNN':
         # initialize
         model = build_model(cfg)
@@ -110,11 +110,11 @@ def evaluate_fps(test_dataloader, weights_path):
         model = model.to(device)
 
         model.eval()
-        num_iter = len(data_list)
+        num_iter = len(test_dataloader)
 
         start_time = time()
         # foreach the images
-        for iter_id, eval_data in tqdm(enumerate(data_list), total=num_iter,
+        for iter_id, eval_data in tqdm(enumerate(test_dataloader), total=num_iter,
                                        desc="eval fps for epoch {}".format(epoch)):
             if iter_id > 10:
                 break
@@ -122,7 +122,7 @@ def evaluate_fps(test_dataloader, weights_path):
             # forward the models and loss
             with torch.no_grad():
                 outputs = model(inputs)
-                decode.decode_output(inputs, model, outputs, infos, decode_cfg, device)
+                post_processor.decode_output(inputs, model, outputs, decode_cfg, device)
             del inputs
             torch.cuda.empty_cache()
     else:
@@ -157,4 +157,4 @@ if __name__ == "__main__":
     print("start to evaluate fps...")
 
     evaluate_fps(test_dataloader, cfg.weights_path)
-    logger.close()
+    # logger.close()

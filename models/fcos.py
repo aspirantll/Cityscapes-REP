@@ -79,7 +79,7 @@ train_cfg = Config(cfg=dict(
 test_cfg = Config(cfg=dict(
     nms_pre=1000,
     min_bbox_size=0,
-    score_thr=0.15,
+    score_thr=0.2,
     nms=dict(type='nms', iou_threshold=0.2),
     max_per_img=100))
 

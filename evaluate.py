@@ -15,6 +15,7 @@ __version__ = "1.0.0"
 import argparse
 import torch
 import os
+import json
 import numpy as np
 import warnings
 warnings.filterwarnings("ignore")
@@ -24,7 +25,7 @@ from models import build_model
 
 from configs import Config, Configer
 from utils.logger import Logger
-from utils import decode
+from utils import post_processor
 from utils.tranform import CommonTransforms
 from evaluation.eval_util import eval_outputs
 
@@ -37,8 +38,8 @@ use_cuda = torch.cuda.is_available()
 device_type ='cuda' if use_cuda else 'cpu'
 device = torch.device(device_type)
 
-decode.device = device
-decode.draw_flag = False
+post_processor.device = device
+post_processor.draw_flag = False
 
 
 # load arguments
@@ -121,9 +122,11 @@ def load_weight_paths(weights_dir):
 def eval_weights_dir(weights_dir):
     weight_paths = load_weight_paths(weights_dir)
     logger.write("the num of weights file: {}".format(len(weight_paths)))
+    ret = []
     for iter_id, weight_path in enumerate(weight_paths):
-        if iter_id % 1 == 0:
-            evaluate_model_by_weights(eval_dataloader, weight_path, logger)
+        ret.append(evaluate_model_by_weights(eval_dataloader, weight_path, logger))
+        with open("./%s_aps.json"%cfg.model_type, 'w') as f:
+            f.write(str(ret))
 
 
 if __name__ == "__main__":

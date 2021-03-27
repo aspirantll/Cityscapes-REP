@@ -18,15 +18,14 @@ import cv2
 import numpy as np
 import warnings
 
-from tqdm import tqdm
+from utils.visualizer import Visualizer
 
 warnings.filterwarnings("ignore")
 
 from utils.logger import Logger
 from models import build_model
 import data
-from utils import decode
-from utils.visualize import visualize_mask
+from utils import post_processor
 from utils import image
 from configs import Config, Configer
 from utils.tranform import CommonTransforms
@@ -55,7 +54,7 @@ decode_cfg = Config(cfg.decode_cfg_path)
 trans_cfg = Configer(configs=cfg.trans_cfg_path)
 
 decode_cfg.model_type = cfg.model_type
-decode.base_dir = data_cfg.save_dir
+post_processor.base_dir = data_cfg.save_dir
 
 if data_cfg.num_classes == -1:
     data_cfg.num_classes = data.get_cls_num(data_cfg.dataset)
@@ -95,14 +94,19 @@ def load_state_dict(model):
 def post_handle(det, instance_map, info):
     img_path = info.img_path
     name = os.path.basename(img_path)
-    logger.write("in {} detected {} objs".format(name, len(det)))
+
+    det_num = len(det[0])
+    logger.write("in {} detected {} objs".format(name, det_num))
+
+    if det_num == 0:
+        return
 
     img = cv2.imread(img_path)
-    for j in range(len(det)):
-        cls_id, conf, instance_id = det[j]
-        img = visualize_mask(img, instance_map==instance_id)
+    visualizer = Visualizer(img[:, :, ::-1])
+    vis_output = visualizer.draw_instance_predictions(det, instance_map)
+
     save_path = os.path.join(data_cfg.save_dir, name)
-    cv2.imwrite(save_path, img)
+    vis_output.save(save_path)
     logger.write("detected result saved in {}".format(save_path))
 
 
@@ -110,9 +114,10 @@ def handle_output(inputs, infos, model):
     # forward the models and loss
     with torch.no_grad():
         outputs = model(inputs)
-        dets, instance_maps, det_boxes = decode.decode_output(inputs, model, outputs, infos, decode_cfg, device)
+        dets, instance_maps = post_processor.decode_output(inputs, model, outputs, decode_cfg, device)
         for i in range(len(dets)):
-            post_handle(dets[i], instance_maps[i], infos[i])
+            if len(dets[i]) != 0:
+                post_handle(dets[i], instance_maps[i], infos[i])
 
 
 def test():
@@ -130,7 +135,7 @@ def test():
     model.eval()
     transforms = CommonTransforms(trans_cfg, "val", device)
 
-    decode.device = device
+    post_processor.device = device
     if data_cfg.test_dir is not None:
         # initialize the dataloader by dir
         test_dataloader = data.get_dataloader(data_cfg.batch_size, data_cfg.dataset, data_cfg.test_dir,

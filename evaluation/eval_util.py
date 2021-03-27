@@ -21,11 +21,11 @@ import numpy as np
 
 from data.cityscapes import label_ids, label_names
 from evaluation import eval_map
-from utils import decode
+from utils import post_processor
 
 
 def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, device, logger, metrics):
-    decode.device = device
+    post_processor.device = device
     output_dir = os.path.join(data_cfg.save_dir, 'results_' + str(epoch))
 
     if os.path.exists("./matches.json"):
@@ -48,21 +48,21 @@ def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, d
         # forward the models and loss
         with torch.no_grad():
             outputs = model(inputs)
-            dets, instance_maps, det_boxes = decode.decode_output(inputs, model, outputs, infos, decode_cfg, device)
+            dets, instance_maps = post_processor.decode_output(inputs, model, outputs, decode_cfg, device)
         del inputs
         torch.cuda.empty_cache()
 
+        classes, scores, boxes, instance_ids = dets
         if "box" in metrics:
             # detections
-            for i in range(len(det_boxes)):
-                det = det_boxes[i]
+            for i in range(len(classes)):
                 det_result = []
                 for j in range(1, data_cfg.num_classes):
-                    boxes = np.zeros((0, 5))
-                    for k, box in enumerate(det["rois"]):
-                        if det["class_ids"][k] == j:
-                            boxes = np.append(boxes, np.append(box, det["scores"][k]).reshape((1, 5)), axis=0)
-                    det_result.append(boxes)
+                    det_boxes = np.zeros((0, 5))
+                    for k, box in enumerate(boxes):
+                        if classes[k] == j:
+                            det_boxes = np.append(det_boxes, np.append(box, scores[k]).reshape((1, 5)), axis=0)
+                    det_result.append(det_boxes)
                 det_results.append(det_result)
 
             # annotations
@@ -95,7 +95,6 @@ def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, d
         if "instance" in metrics:
             for i in range(len(dets)):
                 im_name = infos[i][0]
-                img_size = infos[i][1]
                 instance_map = instance_maps[i]
 
                 basename = os.path.splitext(os.path.basename(im_name))[0]
@@ -105,25 +104,27 @@ def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, d
                         clss = label_names[j]
                         clss_id = label_ids[j]
 
-                        for k in range(len(dets[i])):
-                            center_cls, center_conf, instance_id = dets[i][k]
+                        for k in range(len(classes)):
+                            center_cls, center_conf, instance_id = classes[k], scores[k], instance_ids[k]
                             if center_cls != j:
                                 continue
-                            score = center_conf
                             mask = instance_map == instance_id
                             pngname = os.path.join(basename + '_' + clss + '_{}.png'.format(k))
                             # write txt
-                            fid_txt.write('{} {} {}\n'.format(pngname, clss_id, score))
+                            fid_txt.write('{} {} {}\n'.format(pngname, clss_id, center_conf))
                             # save mask
                             cv2.imwrite(os.path.join(output_dir, pngname), mask * 255)
+
+    metric_aps = OrderedDict()
+
     if "box" in metrics:
         print("------------------------------------box---------------------------------------")
         print("epoch:", epoch)
         print("config:", decode_cfg)
         print("iou for mAP:", 0.5)
-        eval_map(det_results, det_annotations, dataset=dataset, iou_thr=0.5)
+        metric_aps["Box_AP50"] = eval_map(det_results, det_annotations, dataset=dataset, iou_thr=0.5)
         print("iou for mAP:", 0.75)
-        eval_map(det_results, det_annotations, dataset=dataset, iou_thr=0.75)
+        metric_aps["Box_AP75"] = eval_map(det_results, det_annotations, dataset=dataset, iou_thr=0.75)
     if "instance" in metrics:
         import cityscapesscripts.evaluation.evalInstanceLevelSemanticLabeling as cityscapes_eval
 
@@ -152,5 +153,6 @@ def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, d
             predictionImgList, groundTruthImgList, cityscapes_eval.args
         )["averages"]
 
-        ret = OrderedDict()
-        ret["segm"] = {"AP": results["allAp"] * 100, "AP50": results["allAp50%"] * 100}
+        metric_aps["segm"] = {"AP": results["allAp"] * 100, "AP50": results["allAp50%"] * 100}
+
+    return {epoch: metric_aps}
