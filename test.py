@@ -28,8 +28,7 @@ import data
 from utils import post_processor
 from utils import image
 from configs import Config, Configer
-from utils.tranform import CommonTransforms
-
+from utils.tranform import CommonTransforms, TransInfo
 
 # global torch configs for training
 torch.backends.cudnn.enabled = True
@@ -54,17 +53,16 @@ decode_cfg = Config(cfg.decode_cfg_path)
 trans_cfg = Configer(configs=cfg.trans_cfg_path)
 
 decode_cfg.model_type = cfg.model_type
-post_processor.base_dir = data_cfg.save_dir
 
 if data_cfg.num_classes == -1:
     data_cfg.num_classes = data.get_cls_num(data_cfg.dataset)
 
 # validate the arguments
-print("test dir:", data_cfg.test_dir)
+# print("test dir:", data_cfg.test_dir)
 if data_cfg.test_dir is not None and not os.path.exists(data_cfg.test_dir):
     raise Exception("the test dir cannot be found.")
 
-print("save dir:", data_cfg.save_dir)
+# print("save dir:", data_cfg.save_dir)
 if not os.path.exists(data_cfg.save_dir):
     os.makedirs(data_cfg.save_dir)
 
@@ -88,7 +86,7 @@ def load_state_dict(model):
     """
     checkpoint = torch.load(cfg.weights_path, map_location=device_type)
     model.load_state_dict(checkpoint["state_dict"])
-    logger.write("loaded the weights:" + cfg.weights_path)
+    # logger.write("loaded the weights:" + cfg.weights_path)
 
 
 def post_handle(det, instance_map, info):
@@ -107,7 +105,11 @@ def post_handle(det, instance_map, info):
 
     save_path = os.path.join(data_cfg.save_dir, name)
     vis_output.save(save_path)
-    logger.write("detected result saved in {}".format(save_path))
+    out_img = cv2.resize(vis_output.get_image()[:, :, ::-1], (1024, 512))
+    cv2.imshow('output', out_img)
+    cv2.waitKey(10)
+
+    # logger.write("detected result saved in {}".format(save_path))
 
 
 def handle_output(inputs, infos, model):
@@ -148,8 +150,8 @@ def test():
     else:
         img_path = data_cfg.test_image
         input_img = image.load_rgb_image(img_path)
-        input, _, info = transforms(input_img, img_path=img_path)
-        handle_output(input.unsqueeze(0), [info], model)
+        input, _ = transforms(input_img)
+        handle_output(input.unsqueeze(0), [TransInfo(img_path, input_img.shape)], model)
     logger.close()
 
 

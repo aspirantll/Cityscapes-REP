@@ -9,17 +9,12 @@ __copyright__ = \
 __authors__ = ""
 __version__ = "1.0.0"
 
-import os
-
 from utils.utils import BBoxTransform, ClipBoxes, generate_coordinates, generate_corner
 import torch
 import torch.nn as nn
 from torchvision.ops.boxes import batched_nms
 import numpy as np
 from utils import parell_util
-
-base_dir = r""
-target_size = 1
 
 xym = generate_coordinates()
 
@@ -85,6 +80,7 @@ def group_instance_map(ae_mat, boxes_cls, boxes_confs, boxes, center_embeddings,
 
         # nms
         instance_map_cut = instance_map[lt[0]:rb[0], lt[1]:rb[1]]
+        conf_map_cut = conf_map[lt[0]:rb[0], lt[1]:rb[1]]
         occupied_ids = instance_map_cut.unique().cpu().numpy()
         skip = False
         for occupied_id in occupied_ids:
@@ -95,6 +91,8 @@ def group_instance_map(ae_mat, boxes_cls, boxes_confs, boxes, center_embeddings,
             if overlapped_area.sum().item() / proposal.sum().item() >= 0.5:
                 skip = True
                 break
+            if (conf_map_cut[overlapped_area] >= dist[overlapped_area]).sum() > overlapped_area.sum() / 2:
+                proposal[overlapped_area] = False
 
         if skip or proposal.sum().item() < 128 or proposal.sum().item() / area < 0.3:
             continue
@@ -167,12 +165,15 @@ def decode_boxes(x, anchors, box_regression, center_regression, classification, 
 def decode_single(ae_mat, dets, device):
     cls_ids, boxes, confs, center_embeddings = dets["class_ids"], dets["rois"], dets["scores"], dets["embeddings"]
     if len(cls_ids) == 0:
-        return ([], [])
+        return ((np.array(()), np.array(()), np.array(()), np.array(())), np.array(()))
 
     cls_ids, confs, boxes, instance_ids, instance_map = group_instance_map(ae_mat, cls_ids, confs, boxes,
                                                                     center_embeddings, device)
 
-    return ((np.array(cls_ids, dtype=np.uint8), np.array(confs, dtype=np.float), np.vstack(boxes), np.array(instance_ids, dtype=np.uint16)), instance_map)
+    if len(cls_ids) == 0:
+        return ((np.array(()), np.array(()), np.array(()), np.array(())), np.array(()))
+    else:
+        return ((np.array(cls_ids, dtype=np.uint8), np.array(confs, dtype=np.float), np.vstack(boxes), np.array(instance_ids, dtype=np.uint16)), instance_map)
 
 
 def covert_boxlist_to_det_boxes(det_results):

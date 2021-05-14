@@ -52,45 +52,47 @@ def eval_outputs(data_cfg, dataset, eval_dataloader, model, epoch, decode_cfg, d
         del inputs
         torch.cuda.empty_cache()
 
-        classes, scores, boxes, instance_ids = dets
-        if "box" in metrics:
-            # detections
-            for i in range(len(classes)):
-                det_result = []
-                for j in range(1, data_cfg.num_classes):
-                    det_boxes = np.zeros((0, 5))
-                    for k, box in enumerate(boxes):
-                        if classes[k] == j:
-                            det_boxes = np.append(det_boxes, np.append(box, scores[k]).reshape((1, 5)), axis=0)
-                    det_result.append(det_boxes)
-                det_results.append(det_result)
+        obj_num = len(dets)
+        for o_i in range(obj_num):
+            classes, scores, boxes, instance_ids = dets[o_i]
+            if "box" in metrics:
+                # detections
+                for i in range(len(classes)):
+                    det_result = []
+                    for j in range(1, data_cfg.num_classes):
+                        det_boxes = np.zeros((0, 5))
+                        for k, box in enumerate(boxes):
+                            if classes[k] == j:
+                                det_boxes = np.append(det_boxes, np.append(box, scores[k]).reshape((1, 5)), axis=0)
+                        det_result.append(det_boxes)
+                    det_results.append(det_result)
 
-            # annotations
-            for i in range(len(targets[0])):
-                class_map, instance_map = targets[0][i], targets[1][i]
-                class_tensor = torch.from_numpy(class_map)
-                instance_tensor = torch.from_numpy(instance_map)
+                # annotations
+                for i in range(len(targets[0])):
+                    class_map, instance_map = targets[0][i], targets[1][i]
+                    class_tensor = torch.from_numpy(class_map)
+                    instance_tensor = torch.from_numpy(instance_map)
 
-                annotations = np.zeros((0, 5))
-                pre_instance_ids = instance_tensor.unique()
-                pre_instance_ids = pre_instance_ids[pre_instance_ids != 0].cpu().numpy()
-                for o_j, instance_id in enumerate(pre_instance_ids):
-                    mask = instance_tensor == instance_id
-                    labels = class_tensor[mask].unique().cpu()
-                    assert len(labels) == 1
-                    instance_points = mask.nonzero()
-                    lt = instance_points.min(0)[0].cpu().numpy()[::-1]
-                    rb = instance_points.max(0)[0].cpu().numpy()[::-1]
-                    annotation = np.zeros((1, 5))
-                    annotation[0, 0:2] = lt
-                    annotation[0, 2:4] = rb
-                    annotation[0, 4] = labels[0] - 2
-                    annotations = np.append(annotations, annotation, axis=0)
+                    annotations = np.zeros((0, 5))
+                    pre_instance_ids = instance_tensor.unique()
+                    pre_instance_ids = pre_instance_ids[pre_instance_ids != 0].cpu().numpy()
+                    for o_j, instance_id in enumerate(pre_instance_ids):
+                        mask = instance_tensor == instance_id
+                        labels = class_tensor[mask].unique().cpu()
+                        assert len(labels) == 1
+                        instance_points = mask.nonzero()
+                        lt = instance_points.min(0)[0].cpu().numpy()[::-1]
+                        rb = instance_points.max(0)[0].cpu().numpy()[::-1]
+                        annotation = np.zeros((1, 5))
+                        annotation[0, 0:2] = lt
+                        annotation[0, 2:4] = rb
+                        annotation[0, 4] = labels[0] - 2
+                        annotations = np.append(annotations, annotation, axis=0)
 
-                det_annotations.append({
-                    "bboxes": annotations[:, :4],
-                    "labels": annotations[:, 4]
-                })
+                    det_annotations.append({
+                        "bboxes": annotations[:, :4],
+                        "labels": annotations[:, 4]
+                    })
 
         if "instance" in metrics:
             for i in range(len(dets)):

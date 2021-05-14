@@ -474,15 +474,15 @@ class Visualizer:
 
                 height_ratio = (y1 - y0) / np.sqrt(self.output.height * self.output.width)
                 lighter_color = self._change_color_brightness(color, brightness_factor=0.7)
-                font_size = (
-                    np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2)
-                    * 0.5
-                    * self._default_font_size
+                font_size = (min(np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2)
+                    * 2
+                    * self._default_font_size, (boxes[i][3]-boxes[i][1])/len(labels[i]))
                 )
                 self.draw_text(
                     labels[i],
                     text_pos,
                     color=lighter_color,
+                    bg_color=color,
                     horizontal_alignment=horiz_align,
                     font_size=font_size,
                 )
@@ -539,6 +539,7 @@ class Visualizer:
         *,
         font_size=None,
         color="g",
+        bg_color="black",
         horizontal_alignment="center",
         rotation=0
     ):
@@ -570,7 +571,7 @@ class Visualizer:
             text,
             size=font_size * self.output.scale,
             family="sans-serif",
-            bbox={"facecolor": "black", "alpha": 0.8, "pad": 0.7, "edgecolor": "none"},
+            bbox={"facecolor": bg_color, "alpha": 0.8, "pad": 0.7, "edgecolor": "none"},
             verticalalignment="top",
             horizontalalignment=horizontal_alignment,
             color=color,
@@ -790,22 +791,19 @@ class Visualizer:
         Returns:
             output (VisImage): image object with polygon drawn.
         """
-        # if edge_color is None:
-        #     # make edge color darker than the polygon color
-        #     if alpha > 0.8:
-        #         edge_color = self._change_color_brightness(color, brightness_factor=-0.7)
-        #     else:
-        #         edge_color = color
-        # edge_color = mplc.to_rgb(edge_color) + (1,)
-        alpha = 0.3
-        c = (np.random.random(3) * 0.6 + 0.4).tolist()
-        color = tuple(c)+(alpha,)
+        if edge_color is None:
+            # make edge color darker than the polygon color
+            if alpha > 0.8:
+                edge_color = self._change_color_brightness(color, brightness_factor=-0.7)
+            else:
+                edge_color = color
+        edge_color = mplc.to_rgb(edge_color) + (1,)
 
         polygon = mpl.patches.Polygon(
             segment,
             fill=True,
-            facecolor=color,
-            edgecolor=color,
+            facecolor=mplc.to_rgb(color) + (alpha,),
+            edgecolor=edge_color,
             linewidth=max(self._default_font_size // 15 * self.output.scale, 1),
         )
         self.output.ax.add_patch(polygon)

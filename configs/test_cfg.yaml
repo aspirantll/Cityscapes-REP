@@ -1,7 +1,7 @@
 data:
-  test_dir: /media/liulei/Data/cityscapes/leftImg8bit/test
+  test_dir: /media/liulei/Data/checkpoints/fcos_mask/selected_imgs
   test_image:
-  save_dir: /media/liulei/Data/checkpoints/fcos_mask/test
+  save_dir: /media/liulei/Data/checkpoints/mask/test_eff
   dataset: dir
   batch_size: 1
   input_size: (512, 1024)
@@ -9,9 +9,9 @@ data:
 
 seed: 1
 compound_coef: 3
-model_type: fcos
+model_type: eff
 anchors_scales: '[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)]'
 anchors_ratios: '[(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]'
-weights_path: /media/liulei/Data/checkpoints/fcos_mask/final_weights/fcos_weights_00000036.pth
+weights_path: /media/liulei/Data/checkpoints/mask_weights/eff_weights_00000044.pth
 decode_cfg_path: ./configs/decode_cfg.yaml
 trans_cfg_path: ./configs/trans_cfg.json

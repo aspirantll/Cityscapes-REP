@@ -102,42 +102,25 @@ def evaluate_fps(test_dataloader, weights_path):
     :param eval_dataloader:
     :return:
     """
-    # data_list = [eval_data for eval_data in test_dataloader]
-    if cfg.model_type != 'maskRCNN':
-        # initialize
-        model = build_model(cfg)
-        epoch = load_state_dict(model, weights_path)
-        model = model.to(device)
+    # initialize
+    model = build_model(cfg)
+    epoch = load_state_dict(model, weights_path)
+    model = model.to(device)
 
-        model.eval()
-        num_iter = len(test_dataloader)
+    model.eval()
+    num_iter = len(test_dataloader)
 
-        start_time = time()
-        # foreach the images
-        for iter_id, eval_data in tqdm(enumerate(test_dataloader), total=num_iter,
-                                       desc="eval fps for epoch {}".format(epoch)):
-            if iter_id > 10:
-                break
-            inputs, infos = eval_data
-            # forward the models and loss
-            with torch.no_grad():
-                outputs = model(inputs)
-                post_processor.decode_output(inputs, model, outputs, decode_cfg, device)
-            del inputs
-            torch.cuda.empty_cache()
-    else:
-        from mmdet.apis import init_detector, inference_detector
-        config_file = 'configs/mask_rcnn_r50_fpn_1x_cityscapes.py'
-        # init a detector
-        model = init_detector(config_file, weights_path, device=device)
-        num_iter = len(data_list)
-
-        start_time = time()
-        # foreach the images
-        for iter_id, img in tqdm(enumerate(data_list), total=num_iter,
-                                       desc="eval fps"):
-            # to device
-            inference_detector(model, img)
+    start_time = time()
+    # foreach the images
+    for iter_id, eval_data in tqdm(enumerate(test_dataloader), total=num_iter,
+                                   desc="eval fps for epoch {}".format(epoch)):
+        inputs, infos = eval_data
+        # forward the models and loss
+        with torch.no_grad():
+            outputs = model(inputs)
+            post_processor.decode_output(inputs, model, outputs, decode_cfg, device)
+        del inputs
+        torch.cuda.empty_cache()
     end_time = time()
     print("total times: %f" % (end_time-start_time))
     print("total image num: %d" % num_iter)
@@ -146,15 +129,11 @@ def evaluate_fps(test_dataloader, weights_path):
 
 if __name__ == "__main__":
     data_cfg.batch_size = 1
-    if cfg.model_type == 'maskRCNN':
-        test_dataloader = data.get_dataset(data_cfg.dataset, data_cfg.eval_dir,
-                                              phase=data_cfg.subset)
-    else:
-        transforms = CommonTransforms(trans_cfg, "val", device)
-        test_dataloader = data.get_dataloader(data_cfg.batch_size, data_cfg.dataset, data_cfg.eval_dir,
-                                              with_label=False, phase=data_cfg.subset, transforms=transforms)
+    transforms = CommonTransforms(trans_cfg, "val", device)
+    test_dataloader = data.get_dataloader(data_cfg.batch_size, data_cfg.dataset, data_cfg.eval_dir,
+                                          with_label=False, phase=data_cfg.subset, transforms=transforms)
+
     # eval
     print("start to evaluate fps...")
-
     evaluate_fps(test_dataloader, cfg.weights_path)
     # logger.close()
