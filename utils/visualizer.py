@@ -12,7 +12,7 @@ import pycocotools.mask as mask_util
 import torch
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-from data.cityscapes import label_names
+from data.customize import label_names
 from .colormap import random_color
 
 logger = logging.getLogger(__name__)
@@ -343,7 +343,7 @@ class Visualizer:
         )
         self._instance_mode = instance_mode
 
-    def draw_instance_predictions(self, det, instance_map):
+    def draw_instance_predictions(self, det):
         """
         Draw instance-level prediction results on an image.
 
@@ -355,10 +355,10 @@ class Visualizer:
         Returns:
             output (VisImage): image object with visualizations.
         """
-        classes, scores, boxes, instance_ids = det
+        classes, scores, boxes, polygons = det
         labels = _create_text_labels(classes, scores, label_names)
 
-        masks = [GenericMask(instance_map==instance_id, self.output.height, self.output.width) for instance_id in instance_ids]
+        masks = [GenericMask([polygon], self.output.height, self.output.width) for polygon in polygons]
 
         self.overlay_instances(
             masks=masks,
@@ -367,6 +367,31 @@ class Visualizer:
         )
         return self.output
 
+    def draw_instance_gt(self, boxes_ann, instance_map):
+        """
+        Draw instance-level prediction results on an image.
+
+        Args:
+            predictions (Instances): the output of an instance detection/segmentation
+                model. Following fields will be used to draw:
+                "pred_boxes", "pred_classes", "scores", "pred_masks" (or "pred_masks_rle").
+
+        Returns:
+            output (VisImage): image object with visualizations.
+        """
+        num = len(boxes_ann)
+
+        classes, boxes, scores = list(boxes_ann[:, 4].astype(np.int)), boxes_ann[:, :4], [1.0]*num
+        labels = _create_text_labels(classes, scores, label_names)
+
+        masks = [GenericMask(instance_map == instance_id, self.output.height, self.output.width) for instance_id in range(1, num+1)]
+
+        self.overlay_instances(
+            masks=masks,
+            boxes=boxes,
+            labels=labels,
+        )
+        return self.output
 
     def overlay_instances(
         self,
@@ -475,7 +500,7 @@ class Visualizer:
                 height_ratio = (y1 - y0) / np.sqrt(self.output.height * self.output.width)
                 lighter_color = self._change_color_brightness(color, brightness_factor=0.7)
                 font_size = (min(np.clip((height_ratio - 0.02) / 0.08 + 1, 1.2, 2)
-                    * 2
+                    * 20
                     * self._default_font_size, (boxes[i][3]-boxes[i][1])/len(labels[i]))
                 )
                 self.draw_text(

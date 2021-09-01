@@ -1,9 +1,9 @@
 data:
-  eval_dir:  /media/liulei/Data/cityscapes
-  save_dir: /media/liulei/Data/checkpoints/mask/eval
-  dataset: cityscapes
+  eval_dir: /media/liulei/Data/dataset/bigdata/carImages
+  save_dir: /media/liulei/Data/checkpoints/bigdata/eval
+  dataset: customize
   batch_size: 1
-  input_size: (512, 1024)
+  input_size: (512, 512)
   num_classes: -1
   subset: val
 
@@ -12,8 +12,8 @@ compound_coef: 3
 model_type: eff
 anchors_scales: '[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)]'
 anchors_ratios: '[(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]'
-weights_path: ./weights/eff_weights_00000044.pth
-weights_dir: #/media/liulei/Data/checkpoints/weights
+weights_path:
+weights_dir: /media/liulei/Data/checkpoints/bigdata
 decode_cfg_path: ./configs/decode_cfg.yaml
 trans_cfg_path: ./configs/trans_cfg.json
-metrics: ['box','instance']
+metrics: ['box']

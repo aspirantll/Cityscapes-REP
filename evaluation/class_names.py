@@ -88,13 +88,20 @@ def cityscapes_classes():
     ]
 
 
+def customize_classes():
+    return [
+        'Motor Vehicle', 'Non-motorized Vehicle', 'Pedestrian', 'Traffic Light-Red Light', 'Traffic Light-Yellow Light', 'Traffic Light-Green Light', 'Traffic Light-Off', 'Solid lane line', 'Dotted lane line', 'Crosswalk'
+    ]
+
+
 dataset_aliases = {
     'voc': ['voc', 'pascal_voc', 'voc07', 'voc12'],
     'imagenet_det': ['det', 'imagenet_det', 'ilsvrc_det'],
     'imagenet_vid': ['vid', 'imagenet_vid', 'ilsvrc_vid'],
     'coco': ['coco', 'mscoco', 'ms_coco'],
     'wider_face': ['WIDERFaceDataset', 'wider_face', 'WDIERFace'],
-    'cityscapes': ['cityscapes']
+    'cityscapes': ['cityscapes'],
+    'customize': ['customize']
 }
 
 

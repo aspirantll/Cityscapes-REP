@@ -11,17 +11,19 @@ __version__ = "1.0.0"
 
 import torch
 from data.dataset import is_train_phase, is_val_phase
-from data import cityscapes, coco
+from data import cityscapes, coco, customize
 from data.dir import DirDatasetBuilder
 
 
 datasetBuildersMap = {
+    "customize": customize.CustomizeDatasetBuilder,
     "cityscapes": cityscapes.CityscapesDatasetBuilder,
     "coco": coco.COCODatasetBuilder,
     "dir": DirDatasetBuilder
 }
 
 datasetClsNumMap = {
+    "customize": customize.num_cls,
     "cityscapes": cityscapes.num_cls,
     "coco": coco.num_cls
 }
@@ -39,7 +41,7 @@ def collate_fn_with_label(batch):
     """
     batch_inputs = [e for e in zip(*batch)]
     input_tensors = torch.stack(batch_inputs[0])
-    labels = [e for e in zip(*batch_inputs[1])]
+    labels = batch_inputs[1]
     trans_infos = batch_inputs[2]
     return input_tensors, labels, trans_infos
 

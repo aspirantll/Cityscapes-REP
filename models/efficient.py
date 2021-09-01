@@ -14,7 +14,6 @@ from models.lovasz_losses import lovasz_hinge
 from utils.target_generator import generate_all_annotations
 from utils.utils import generate_coordinates, convert_corner_to_corner
 
-
 class SeparableConvBlock(nn.Module):
     """
     created by Zylo117
@@ -596,7 +595,6 @@ class EfficientSeg(nn.Module):
         self.backbone_compound_coef = [0, 1, 2, 3, 4, 5, 6, 6, 7]
         self.fpn_num_filters = [64, 88, 112, 160, 224, 288, 384, 384, 384]
         self.fpn_cell_repeats = [3, 4, 5, 6, 7, 7, 8, 8, 8]
-        self.input_sizes = [512, 640, 768, 896, 1024, 1280, 1280, 1536, 1536]
         self.box_class_repeats = [3, 3, 3, 4, 4, 4, 5, 5, 5]
         self.pyramid_levels = [5, 5, 5, 5, 5, 5, 5, 5, 6]
         self.anchor_scale = [4., 4., 4., 4., 4., 4., 4., 5., 4.]
@@ -920,33 +918,34 @@ class AnchorBaseAELoss(object):
 
             instance_loss = zero_tensor(self._device)
 
+            mask_item_num = 0
             for o_j, instance_id in enumerate(instance_ids):
                 in_mask = instance_map.eq(instance_id).view(1, h, w) # 1 x h x w
+                if in_mask.sum() != 0:
+                    # calculate center of attraction
+                    o_lt = det_annotations[b_i, o_j, 0:2][::-1].astype(np.int32)
+                    o_rb = det_annotations[b_i, o_j, 2:4][::-1].astype(np.int32)
 
-                # calculate center of attraction
-                o_lt = det_annotations[b_i, o_j, 0:2][::-1].astype(np.int32)
-                o_rb = det_annotations[b_i, o_j, 2:4][::-1].astype(np.int32)
+                    center_embedding = center_embeddings[b_i][o_j]
+                    if center_embedding.eq(0).all():
+                        continue
 
-                center_embedding = center_embeddings[b_i][o_j]
-                if center_embedding.eq(0).all():
-                    continue
+                    s = torch.exp(center_embedding[2])
 
-                s = torch.exp(center_embedding[2])
+                    # limit 2*box_size mask
+                    lt, rb = convert_corner_to_corner(o_lt, o_rb, h, w, 1.5)
+                    selected_spatial_emb = spatial_emb[:, lt[0]:rb[0], lt[1]:rb[1]]
+                    label_mask = in_mask[:, lt[0]:rb[0], lt[1]:rb[1]].float()
+                    center = torch.tanh(center_embeddings[b_i][o_j][:2]).view(2,1,1)
+                    # calculate gaussian
+                    dist = torch.exp(-1 * torch.sum(
+                        torch.pow(selected_spatial_emb - center, 2) * s, 0, keepdim=True))
 
-                # limit 2*box_size mask
-                lt, rb = convert_corner_to_corner(o_lt, o_rb, h, w, 1.5)
-                selected_spatial_emb = spatial_emb[:, lt[0]:rb[0], lt[1]:rb[1]]
-                label_mask = in_mask[:, lt[0]:rb[0], lt[1]:rb[1]].float()
-                center = torch.tanh(center_embeddings[b_i][o_j][:2]).view(2,1,1)
-                # calculate gaussian
-                dist = torch.exp(-1 * torch.sum(
-                    torch.pow(selected_spatial_emb - center, 2) * s, 0, keepdim=True))
-
-                # apply lovasz-hinge loss
-                instance_loss = instance_loss + \
-                                lovasz_hinge(dist * 2 - 1, label_mask)
-
-            ae_loss += instance_loss / max(n, 1)
+                    # apply lovasz-hinge loss
+                    instance_loss = instance_loss + \
+                                    lovasz_hinge(dist * 2 - 1, label_mask)
+                    mask_item_num = mask_item_num + 1
+            ae_loss += instance_loss / max(mask_item_num, 1)
         # compute mean loss
         return ae_loss / b
 

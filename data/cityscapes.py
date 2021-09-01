@@ -118,16 +118,19 @@ def decode_instance(pic):
         (pic.shape[0], pic.shape[1]), dtype=np.uint8)
 
     # contains the class of each instance, but will set the class of "unlabeled instances/groups" to bg
-    class_map = np.zeros(
-        (pic.shape[0], pic.shape[1]), dtype=np.uint8)
+    class_ids = np.empty((0, 5), dtype=np.float32)
 
     for i, c in enumerate(label_ids):
         mask = np.logical_and(pic >= c * 1000, pic < (c + 1) * 1000)
         if mask.sum() > 0:
             ids, _, _ = relabel_sequential(pic[mask])
             instance_map[mask] = ids + np.amax(instance_map)
-            class_map[mask] = i+1
-    return class_map, instance_map
+
+            pos_y, pos_x = mask.nonzero()
+            class_ids = np.append(class_ids,
+                                  np.array([[pos_x.min(), pos_y.min(),
+                                            pos_x.max(), pos_y.max(), i+1]], dtype=np.float32), axis=0)
+    return class_ids, instance_map
 
 
 class CityscapesDataset(Dataset):
@@ -157,11 +160,12 @@ class CityscapesDataset(Dataset):
         filenameGt = self.filenamesGt[index]
         instance_img = load_instance_image(filenameGt)
         label = decode_instance(instance_img)
-        img_size = input_img.shape[:2]
+        img_size = input_img.shape[1::-1]
 
         if self._transforms is not None:
-            input_img, label = self._transforms(input_img, label)
-        return input_img, label, TransInfo(img_path, img_size)
+            return self._transforms(input_img, label, img_path=img_path, img_size=img_size)
+
+        return input_img, label, TransInfo(img_path, img_size, 1,0, img_size)
 
     def __len__(self):
         return len(self.filenames)

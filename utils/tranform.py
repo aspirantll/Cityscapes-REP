@@ -14,7 +14,7 @@ import torch
 import numpy as np
 from PIL import Image
 
-TransInfo = namedtuple('TransInfo', ['img_path', 'img_size'])
+TransInfo = namedtuple('TransInfo', ['img_path', 'img_size', 'scale', 'scaled_size', 'pad_size'])
 
 
 class Normalize(object):
@@ -88,77 +88,58 @@ class ToTensor(object):
         return inputs.float()
 
 
-class CoordinateReverser(object):
-    def __call__(self, label):
-        cls_ids, polygons = label
-        polygons = [poly[:, ::-1].astype(np.int32) for poly in polygons]
-        return cls_ids, polygons
-
-
-class ReLabel(object):
-    """
-      255 indicate the background, relabel 255 to some value.
-    """
-    def __init__(self, olabel, nlabel):
-        self.olabel = olabel
-        self.nlabel = nlabel
-
-    def __call__(self, inputs):
-        assert isinstance(inputs, torch.LongTensor), 'tensor needs to be LongTensor'
-
-        inputs[inputs == self.olabel] = self.nlabel
-        return inputs
-
-
 class Resizer(object):
     """Convert ndarrays in sample to Tensors."""
 
-    def __init__(self, img_size=512):
+    def __init__(self, img_size=(512, 1024)):
         self.img_size = img_size
+        self.color = (114, 114, 114)
 
     def __call__(self, image, label=None):
+        if self.img_size[0] == -1:
+            return image, label, 1.0, image.shape[1::-1], (0, 0)
+
         height, width, _ = image.shape
-        if height > width:
-            scale = self.img_size / height
-            resized_height = self.img_size
-            resized_width = int(width * scale)
-        else:
-            scale = self.img_size / width
-            resized_height = int(height * scale)
-            resized_width = self.img_size
+        scale = min(self.img_size[0]/height, self.img_size[1]/width)
+
+        resized_height = int(height * scale)
+        resized_width = int(width * scale)
+
+        pad_left = (self.img_size[1]-resized_width)//2
+        pad_right = self.img_size[1]-resized_width-pad_left
+        pad_top = self.img_size[0]-resized_height
+        pad_bottom = self.img_size[0]-resized_height-pad_top
 
         image = cv2.resize(image, (resized_width, resized_height), interpolation=cv2.INTER_LINEAR)
 
-        new_image = np.zeros((self.img_size, self.img_size, 3))
-        new_image[0:resized_height, 0:resized_width] = image
+        new_image = cv2.copyMakeBorder(image, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=self.color)  # add border
 
         if label is not None:
-            class_map, instance_map = label
-
-            class_map = cv2.resize(class_map, (resized_width, resized_height), interpolation=cv2.INTER_NEAREST)
-            new_class_map = np.zeros((self.img_size, self.img_size))
-            new_class_map[0:resized_height, 0:resized_width] = class_map
+            class_ids, instance_map = label
 
             instance_map = cv2.resize(instance_map, (resized_width, resized_height), interpolation=cv2.INTER_NEAREST)
-            new_instance_map = np.zeros((self.img_size, self.img_size))
-            new_instance_map[0:resized_height, 0:resized_width] = instance_map
+            new_instance_map = cv2.copyMakeBorder(instance_map, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=0)  # add border
 
-            label = (new_class_map, new_instance_map)
+            class_ids[:, :4] = class_ids[:, :4]*scale+np.array(((pad_left, pad_top, pad_left, pad_top)), dtype=np.float32)
+            label = (class_ids, new_instance_map)
 
-        return new_image, label, scale
+        return new_image, label, scale, (resized_width, resized_height), (pad_left, pad_top)
 
 
 class Augmenter(object):
     """Convert ndarrays in sample to Tensors."""
-
     def __call__(self, image, label, flip_x=0.5):
         if np.random.rand() < flip_x:
             image = image[:, ::-1, :].copy()
             if label is not None:
-                class_map, instance_map = label
-                class_map = class_map[:, ::-1].copy()
+                class_ids, instance_map = label
                 instance_map = instance_map[:, ::-1].copy()
-                label = (class_map, instance_map)
+
+                height, width = instance_map.shape
+                class_ids[:, 0] = width - class_ids[:, 0]
+                class_ids[:, 2] = width - class_ids[:, 2]
+
+                label = (class_ids, instance_map)
 
         return image, label
 
@@ -169,23 +150,24 @@ class CommonTransforms(object):
         self.normalizer = Normalize(div_value=self.configer.get('normalize', 'div_value'),
                             mean=self.configer.get('normalize', 'mean'),
                             std=self.configer.get('normalize', 'std'))
-        self.aug = Augmenter()
         self.to_tensor = ToTensor()
-        self.phase = phase
+        self.resizer = Resizer(self.configer.get('resize_tar'))
+        self.augmenter = Augmenter()
         self.device = device
+        self.phase = phase
 
-    def __call__(self, img, label=None):
+    def __call__(self, img, label=None, img_path=None, img_size=None):
         """
         compose transform the all the transform
         :param img:  rgb and the shape is h*w*c
         :param label: cls_ids, polygons, the pixel of polygons format as (w,h)
-        :param img_path: as the key
         :return:
         """
-        if self.phase == "train":
-            img, label = self.aug(img, label)
+        img, label, scale, scaled_size, pad_size = self.resizer(img, label)
+        if self.phase == 'train':
+            img, label = self.augmenter(img, label)
         input_tensor = self.to_tensor(img)
         if self.device is not None:
             input_tensor = input_tensor.to(self.device)
         input_tensor = self.normalizer(input_tensor)
-        return input_tensor, label
+        return input_tensor, label, TransInfo(img_path, img_size, scale, scaled_size, pad_size)

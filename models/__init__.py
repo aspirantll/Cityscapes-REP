@@ -9,20 +9,16 @@ __copyright__ = \
 __authors__ = ""
 __version__ = "1.0.0"
 
-from . import fcos, efficient
+from . import efficient
 
 EfficientSeg = efficient.EfficientSeg
-FCOSSeg = fcos.FCOSSeg
 EFFLoss = efficient.EffLoss
-FCOSLoss = fcos.FCOSLoss
 
 
 def build_model(cfg):
     if cfg.model_type == "eff":
         model = EfficientSeg(cfg.data.num_classes, compound_coef=cfg.compound_coef,
                      ratios=eval(cfg.anchors_ratios), scales=eval(cfg.anchors_scales))
-    elif cfg.model_type == "fcos":
-        model = FCOSSeg(cfg.data.num_classes)
     else:
         raise RuntimeError("no support for model type:%s"%cfg.model_type)
     return model
@@ -31,8 +27,6 @@ def build_model(cfg):
 def build_loss(cfg, device):
     if cfg.model_type == "eff":
         loss = EFFLoss(device)
-    elif cfg.model_type == "fcos":
-        loss = FCOSLoss(device)
     else:
         raise RuntimeError("no support for model type:%s"%cfg.model_type)
     return loss

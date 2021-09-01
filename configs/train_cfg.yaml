@@ -1,10 +1,10 @@
 data:
-  train_dir:  /media/liulei/Data/cityscapes
-  save_dir: /media/liulei/Data/checkpoints/mask
-  dataset: cityscapes
+  train_dir: /media/liulei/Data/dataset/bigdata/carImages
+  save_dir: /media/liulei/Data/checkpoints/bigdata/
+  dataset: customize
   batch_size: 1
   num_classes: -1
-  subset: train0
+  subset: train
 
 optimizer:
   lr: 1e-4
@@ -15,11 +15,11 @@ max_iter: 500
 num_epochs: 2000
 save_span: 1000
 seed: 1
-compound_coef: 0
+compound_coef: 3
 model_type: eff
 anchors_scales: '[2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)]'
 anchors_ratios: '[(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]'
-pretrained_path: /media/liulei/Data/checkpoints/efficient/efficientdet-d0.pth
+pretrained_path: /media/liulei/Data/checkpoints/efficient/efficientdet-d3.pth
 decode_cfg_path: ./configs/decode_cfg.yaml
 trans_cfg_path: ./configs/trans_cfg.json
 start_eval_epoch: 1000

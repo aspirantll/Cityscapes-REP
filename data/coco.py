@@ -15,6 +15,7 @@ import numpy as np
 from pycocotools import mask
 from torch.utils import data
 from utils.image import poly_to_mask
+from utils.tranform import TransInfo
 from .dataset import DatasetBuilder
 from utils.image import load_rgb_image
 
@@ -86,18 +87,25 @@ class COCODataset(data.Dataset):
         input_img = load_rgb_image(path)
 
         height, width, _ = input_img.shape
-        class_map = np.zeros((height, width), dtype=np.uint8)
+        class_ids = np.empty((0, 5), dtype=np.float32)
         instance_map = np.zeros((height, width), dtype=np.uint8)
         instance_id = 1
         for ann in anns:
             # handle boundary, reverse point(w,h) to (h,w)
             mask = parse_segmentation(ann, (height, width))
             instance_map = instance_map*(1-mask)+mask*instance_id
-            class_map = class_map*(1-mask)+mask*convert_cls_id_to_index(ann["category_id"])
 
-        label = (class_map, instance_map)
-        input_img, label, trans_info = self._transforms(input_img, label, path)
-        return input_img, label, trans_info
+            pos_y, pos_x = mask.nonzero()
+            class_ids = np.append(class_ids,
+                                  np.array([[pos_x.min(), pos_y.min(),
+                                            pos_x.max(), pos_y.max(), convert_cls_id_to_index(ann["category_id"])]], dtype=np.float32), axis=0)
+
+        label = (class_ids, instance_map)
+        img_size = input_img.shape[1::-1]
+        if self._transforms is not None:
+            return self._transforms(input_img, label, img_path=path, img_size=img_size)
+
+        return input_img, label, TransInfo(path, img_size, 1.0, img_size)
 
     def __len__(self):
         return len(self.ids)

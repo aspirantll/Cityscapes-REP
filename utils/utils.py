@@ -434,8 +434,8 @@ class Anchors(nn.Module):
         if self.last_shape is None or self.last_shape != image_shape:
             self.last_shape = image_shape
 
-        if dtype == torch.float16:
-            dtype = np.float16
+        if dtype == torch.float32:
+            dtype = np.float32
         else:
             dtype = np.float32
 

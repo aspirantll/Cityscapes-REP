@@ -294,104 +294,52 @@ def generate_instance_ids(polygons_list, h, w):
 def generate_all_annotations(target_size, targets, device):
     b, c, h, w = target_size
     class_map_list, instance_map_list = [], []
-    for b_i in range(b):
-        class_tensor = torch.from_numpy(targets[0][b_i]).to(device)
-        instance_tensor = torch.from_numpy(targets[1][b_i]).to(device)
-
-        class_map_list.append(class_tensor)
-        instance_map_list.append(instance_tensor)
-
     instance_ids_list = []
-    det_list = []
+    class_ids_list = []
     max_instance_num = 0
     for b_i in range(b):
-        class_map = class_map_list[b_i]
-        instance_map = instance_map_list[b_i]
-        pre_instance_ids = instance_map.unique()
-        pre_instance_ids = pre_instance_ids[pre_instance_ids != 0].cpu().numpy()
+        instance_map = torch.from_numpy(targets[b_i][1]).to(device)
+        instance_map_list.append(instance_map)
 
-        instance_ids = []
-        dets = []
-        for o_j, instance_id in enumerate(pre_instance_ids):
-            mask = instance_map == instance_id
-            labels = class_map[mask].unique().cpu()
-            assert len(labels) == 1
-            instance_points = mask.nonzero()
-            lt = instance_points.min(0)[0].cpu().numpy()[::-1]
-            rb = instance_points.max(0)[0].cpu().numpy()[::-1]
-            o_w, o_h = rb-lt
-            if o_w >= 2 and o_h >= 2:
-                dets.append((lt, rb, labels[0] - 1))
-                instance_ids.append(instance_id)
+        class_ids = targets[b_i][0]
+        class_ids_list.append(class_ids)
 
+        instance_ids = np.arange(1, len(class_ids)+1)
         max_instance_num = max(max_instance_num, len(instance_ids))
         instance_ids_list.append(instance_ids)
-        det_list.append(dets)
 
     det_annotations = np.ones((b, max_instance_num, 5), dtype=np.float32) * -1
     for b_i in range(b):
-        dets = det_list[b_i]
-        for o_j, det in enumerate(dets):
-            det_annotations[b_i, o_j, 0:2] = det[0]
-            det_annotations[b_i, o_j, 2:4] = det[1]
-            det_annotations[b_i, o_j, 4] = det[2]
+        class_ids = class_ids_list[b_i]
+        det_annotations[b_i, :len(class_ids), :] = class_ids
     return det_annotations, instance_ids_list, instance_map_list
 
 
 def generate_fcos_annotations(target_size, targets, device):
     b, c, h, w = target_size
     class_map_list, instance_map_list = [], []
-    for b_i in range(b):
-        class_tensor = torch.from_numpy(targets[0][b_i]).to(device)
-        instance_tensor = torch.from_numpy(targets[1][b_i]).to(device)
-
-        class_map_list.append(class_tensor)
-        instance_map_list.append(instance_tensor)
-
     instance_ids_list = []
-    det_list = []
+    class_ids_list = []
     max_instance_num = 0
     for b_i in range(b):
-        class_map = class_map_list[b_i]
-        instance_map = instance_map_list[b_i]
-        pre_instance_ids = instance_map.unique()
-        pre_instance_ids = pre_instance_ids[pre_instance_ids != 0].cpu().numpy()
+        instance_map = torch.from_numpy(targets[b_i][1]).to(device)
+        instance_map_list.append(instance_map)
 
-        instance_ids = []
-        dets = []
-        for o_j, instance_id in enumerate(pre_instance_ids):
-            mask = instance_map == instance_id
-            labels = class_map[mask].unique().cpu()
-            assert len(labels) == 1
-            instance_points = mask.nonzero()
-            lt = instance_points.min(0)[0].cpu().numpy()[::-1]
-            rb = instance_points.max(0)[0].cpu().numpy()[::-1]
-            o_w, o_h = rb-lt
-            if o_w >= 2 and o_h >= 2:
-                dets.append((lt, rb, labels[0] - 1))
-                instance_ids.append(instance_id)
+        class_ids = targets[b_i][0]
+        class_ids_list.append(class_ids)
 
+        instance_ids = np.arange(1, len(class_ids)+1)
         max_instance_num = max(max_instance_num, len(instance_ids))
         instance_ids_list.append(instance_ids)
-        det_list.append(dets)
 
     det_annotations = np.ones((b, max_instance_num, 5), dtype=np.float32) * -1
     gt_boxes = []
     gt_labels = []
     for b_i in range(b):
-        dets = det_list[b_i]
-        boxes = np.zeros((len(dets), 4), dtype=np.float32)
-        labels = np.zeros((len(dets)), dtype=np.int64)
-        for o_j, det in enumerate(dets):
-            det_annotations[b_i, o_j, 0:2] = det[0]
-            det_annotations[b_i, o_j, 2:4] = det[1]
-            det_annotations[b_i, o_j, 4] = det[2]
+        class_ids = class_ids_list[b_i]
+        det_annotations[b_i, :len(class_ids), :] = class_ids
 
-            boxes[o_j, 0:2] = det[0]
-            boxes[o_j, 2:4] = det[1]
-            labels[o_j] = det[2]
-
-        gt_boxes.append(torch.tensor(boxes).to(device))
-        gt_labels.append(torch.tensor(labels).to(device))
+        gt_boxes.append(torch.tensor(class_ids[:, :4]).to(device))
+        gt_labels.append(torch.tensor(class_ids[:, 4], dtype=torch.int64).to(device))
 
     return gt_boxes, gt_labels, det_annotations, instance_ids_list, instance_map_list

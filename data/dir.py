@@ -33,10 +33,10 @@ class DirDataset(data.Dataset):
         # locating index
         path = self.imgs[index]
         input_img = load_rgb_image(path)
-        img_size = input_img.shape[:2]
+        img_size = input_img.shape[1::-1]
         if self._transforms is not None:
-            input_img, _ = self._transforms(input_img)
-        return input_img, None, TransInfo(path, img_size)
+            return self._transforms(input_img, img_path=path, img_size=img_size)
+        return input_img, None, TransInfo(path, img_size, 1.0, img_size)
 
     def __len__(self):
         return len(self.imgs)
