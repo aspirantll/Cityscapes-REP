@@ -12,12 +12,14 @@ import pycocotools.mask as mask_util
 import torch
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 
-from data.customize import label_names
 from .colormap import random_color
+from .general import xywhn2xyxy, xyn2xy
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["ColorMode", "VisImage", "Visualizer"]
+
+label_names = [ 'Motor Vehicle', 'Non-motorized Vehicle', 'Pedestrian', 'Traffic Light-Red Light', 'Traffic Light-Yellow Light', 'Traffic Light-Green Light', 'Traffic Light-Off', 'Solid lane line', 'Dotted lane line', 'Crosswalk']  # class names
 
 
 _SMALL_OBJECT_AREA_THRESH = 1000
@@ -343,7 +345,13 @@ class Visualizer:
         )
         self._instance_mode = instance_mode
 
-    def draw_instance_predictions(self, det):
+    def draw_semantic_mask(self, segments):
+        for i in range(1, 4):
+            self.draw_binary_mask(segments == i)
+
+        return self.output
+
+    def draw_instance_predictions(self, pred, polygons):
         """
         Draw instance-level prediction results on an image.
 
@@ -355,7 +363,8 @@ class Visualizer:
         Returns:
             output (VisImage): image object with visualizations.
         """
-        classes, scores, boxes, polygons = det
+        classes, scores, boxes = pred[:, 5].astype(np.int32), pred[:, 4], pred[:, :4]
+
         labels = _create_text_labels(classes, scores, label_names)
 
         masks = [GenericMask([polygon], self.output.height, self.output.width) for polygon in polygons]
@@ -365,9 +374,10 @@ class Visualizer:
             boxes=boxes,
             labels=labels,
         )
+
         return self.output
 
-    def draw_instance_gt(self, boxes_ann, instance_map):
+    def draw_instance_gt(self, boxes_ann, segments):
         """
         Draw instance-level prediction results on an image.
 
@@ -380,17 +390,22 @@ class Visualizer:
             output (VisImage): image object with visualizations.
         """
         num = len(boxes_ann)
+        boxes_ann[:, 2:6] = xywhn2xyxy(boxes_ann[:, 2:6], self.output.width, self.output.height)
+        boxes_ann = boxes_ann.numpy()
 
-        classes, boxes, scores = list(boxes_ann[:, 4].astype(np.int)), boxes_ann[:, :4], [1.0]*num
+        classes, boxes, scores = list(boxes_ann[:, 1].astype(np.int32)), boxes_ann[:, 2:6], [1.0]*num
         labels = _create_text_labels(classes, scores, label_names)
 
-        masks = [GenericMask(instance_map == instance_id, self.output.height, self.output.width) for instance_id in range(1, num+1)]
-
         self.overlay_instances(
-            masks=masks,
+            masks=None,
             boxes=boxes,
             labels=labels,
         )
+
+        segments = segments[0].numpy()//1000
+        for i in range(1, 4):
+            self.draw_binary_mask(segments==i)
+
         return self.output
 
     def overlay_instances(

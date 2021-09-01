@@ -1,5 +1,5 @@
-__version__ = "0.6.1"
-from .model import EfficientNet
+__version__ = "0.7.1"
+from .model import EfficientNet, VALID_MODELS
 from .utils import (
     GlobalParams,
     BlockArgs,
@@ -7,4 +7,3 @@ from .utils import (
     efficientnet,
     get_model_params,
 )
-
